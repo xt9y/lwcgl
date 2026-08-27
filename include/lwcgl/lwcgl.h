@@ -34,6 +34,8 @@ typedef struct DisplayMode {
     LWCGLbool fullscreenCapable;
 } DisplayMode;
 
+typedef DisplayMode LWCGLDisplayModeValue;
+
 #ifdef __cplusplus
 #define DisplayMode(width_, height_) DisplayMode{(width_), (height_), 0, 0, LWCGL_FALSE}
 #else
@@ -89,8 +91,8 @@ typedef struct BufferAPI {
 
 typedef struct DisplayAPI {
     int (*setDisplayMode)(const DisplayMode *mode);
-    DisplayMode (*getDisplayMode)(void);
-    DisplayMode (*getDesktopDisplayMode)(void);
+    LWCGLDisplayModeValue (*getDisplayMode)(void);
+    LWCGLDisplayModeValue (*getDesktopDisplayMode)(void);
     int (*getAvailableDisplayModes)(DisplayMode **modes, size_t *count);
     void (*freeDisplayModes)(DisplayMode *modes);
 
