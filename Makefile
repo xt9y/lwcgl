@@ -1,4 +1,5 @@
 CC ?= cc
+CXX ?= c++
 AR ?= ar
 PREFIX ?= /usr/local
 
@@ -22,7 +23,7 @@ LIBS := $(PKG_LIBS) $(PLATFORM_LIBS)
 
 BUILD := build
 LIB := $(BUILD)/liblwcgl.a
-OBJ := $(BUILD)/lwcgl.o
+OBJ := $(BUILD)/lwcgl.o $(BUILD)/gl11_compat.o
 
 .PHONY: all clean install uninstall example
 
@@ -31,8 +32,11 @@ all: $(LIB)
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(OBJ): src/lwcgl.c include/lwcgl/lwcgl.h | $(BUILD)
+$(BUILD)/lwcgl.o: src/lwcgl.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/lwcgl.c -o $@
+
+$(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/gl11_compat.c -o $@
 
 $(LIB): $(OBJ)
 	$(AR) rcs $@ $^
@@ -43,11 +47,13 @@ example: $(LIB)
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
 	install -m 0644 include/lwcgl/lwcgl.h $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
+	install -m 0644 include/lwcgl/gl11_compat.h $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
 	install -d $(DESTDIR)$(PREFIX)/lib
 	install -m 0644 $(LIB) $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
+	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
 	rmdir $(DESTDIR)$(PREFIX)/include/lwcgl 2>/dev/null || true
 	rm -f $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
 
