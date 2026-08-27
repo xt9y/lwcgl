@@ -333,4 +333,6 @@ void lwcglClearError(void);
 }
 #endif
 
+#include <lwcgl/gl11_compat.h>
+
 #endif
