@@ -1,0 +1,17 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
+      - name: Build C library
+        run: make
+      - name: Compile direct C++ compatibility example
+        run: make example
