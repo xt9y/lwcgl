@@ -25,9 +25,66 @@ BUILD := build
 LIB := $(BUILD)/liblwcgl.a
 OBJ := $(BUILD)/lwcgl.o $(BUILD)/gl11_compat.o
 
-.PHONY: all clean install uninstall example
+.PHONY: all clean install uninstall example check-deps deps
 
-all: $(LIB)
+all: check-deps $(LIB)
+
+check-deps:
+ifeq ($(UNAME_S),Darwin)
+	@command -v pkg-config >/dev/null 2>&1 || { \
+		echo "error: pkg-config is required"; \
+		echo "install with: brew install pkg-config glfw"; \
+		exit 1; \
+	}
+	@pkg-config --exists glfw3 || { \
+		echo "error: GLFW 3 development files are missing"; \
+		echo "install with: brew install glfw"; \
+		exit 1; \
+	}
+else
+	@command -v pkg-config >/dev/null 2>&1 || { \
+		echo "error: pkg-config is required"; \
+		echo "run: make deps"; \
+		exit 1; \
+	}
+	@pkg-config --exists glfw3 || { \
+		echo "error: GLFW 3 development files are missing"; \
+		echo "run: make deps"; \
+		exit 1; \
+	}
+	@printf '#include <GL/gl.h>\n' | $(CC) -x c -E - >/dev/null 2>&1 || { \
+		echo "error: OpenGL development headers are missing"; \
+		echo "run: make deps"; \
+		exit 1; \
+	}
+	@printf '#include <GL/glu.h>\n' | $(CC) -x c -E - >/dev/null 2>&1 || { \
+		echo "error: GLU development headers are missing"; \
+		echo "run: make deps"; \
+		exit 1; \
+	}
+endif
+
+deps:
+ifeq ($(UNAME_S),Darwin)
+	@command -v brew >/dev/null 2>&1 || { echo "error: Homebrew is required to install dependencies automatically"; exit 1; }
+	brew install pkg-config glfw
+else
+	@set -e; \
+	if command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get update; \
+		sudo apt-get install -y build-essential pkg-config libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev; \
+	elif command -v pacman >/dev/null 2>&1; then \
+		sudo pacman -S --needed base-devel pkgconf glfw-x11 mesa glu; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		sudo dnf install -y gcc gcc-c++ make pkgconf-pkg-config glfw-devel mesa-libGL-devel mesa-libGLU-devel; \
+	elif command -v zypper >/dev/null 2>&1; then \
+		sudo zypper install -y gcc gcc-c++ make pkg-config libglfw3-devel Mesa-libGL-devel Mesa-libGLU-devel; \
+	else \
+		echo "error: unsupported package manager"; \
+		echo "install GLFW 3, OpenGL, GLU, pkg-config and a C/C++ toolchain manually"; \
+		exit 1; \
+	fi
+endif
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -41,7 +98,7 @@ $(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl
 $(LIB): $(OBJ)
 	$(AR) rcs $@ $^
 
-example: $(LIB)
+example: check-deps $(LIB)
 	$(CXX) -std=c++17 -Iinclude examples/rd132328.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
 
 install: $(LIB)
