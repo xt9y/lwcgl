@@ -96,7 +96,7 @@ void lwcgl_glMultMatrixBuffer(const LWCGLBuffer *matrix) {
 void lwcgl_gluPickMatrix(GLdouble x, GLdouble y, GLdouble width, GLdouble height,
                          const IntBuffer *viewport) {
     if (!viewport) return;
-    gluPickMatrix(x, y, width, height, (const GLint *)buffer_pointer(viewport));
+    gluPickMatrix(x, y, width, height, (GLint *)buffer_pointer(viewport));
 }
 
 GLint lwcgl_gluBuild2DMipmaps(GLenum target, GLint components, GLsizei width,
