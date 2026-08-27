@@ -15,3 +15,5 @@ jobs:
         run: make
       - name: Compile direct C++ compatibility example
         run: make example
+      - name: Compile rd-132328 API contract
+        run: c++ -std=c++17 -Iinclude tests/rd132328_contract.cpp build/liblwcgl.a $(pkg-config --libs glfw3) -lGL -lGLU -lm -ldl -lpthread -o build/rd132328-contract
