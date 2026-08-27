@@ -17,3 +17,16 @@ jobs:
         run: make example
       - name: Compile rd-132328 API contract
         run: c++ -std=c++17 -Iinclude tests/rd132328_contract.cpp build/liblwcgl.a $(pkg-config --libs glfw3) -lGL -lGLU -lm -ldl -lpthread -o build/rd132328-contract
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
+      - name: Build C library
+        run: make
+      - name: Compile direct C++ compatibility example
+        run: make example
+      - name: Compile rd-132328 API contract
+        run: c++ -DGL_SILENCE_DEPRECATION -std=c++17 -Iinclude tests/rd132328_contract.cpp build/liblwcgl.a $(pkg-config --libs glfw3) -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo -o build/rd132328-contract
