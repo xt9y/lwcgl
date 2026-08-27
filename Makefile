@@ -13,6 +13,7 @@ PKG_LIBS := $(shell pkg-config --libs glfw3 2>/dev/null)
 UNAME_S := $(shell uname -s)
 
 ifeq ($(UNAME_S),Darwin)
+CPPFLAGS += -DGL_SILENCE_DEPRECATION
 PLATFORM_LIBS := -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
 else
 PLATFORM_LIBS := -lGL -lGLU -lm -ldl -lpthread
@@ -67,7 +68,7 @@ endif
 deps:
 ifeq ($(UNAME_S),Darwin)
 	@command -v brew >/dev/null 2>&1 || { echo "error: Homebrew is required to install dependencies automatically"; exit 1; }
-	brew install pkg-config glfw
+	HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
 else
 	@set -e; \
 	if command -v apt-get >/dev/null 2>&1; then \
@@ -99,7 +100,7 @@ $(LIB): $(OBJ)
 	$(AR) rcs $@ $^
 
 example: check-deps $(LIB)
-	$(CXX) -std=c++17 -Iinclude examples/rd132328.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
+	$(CXX) $(CPPFLAGS) -std=c++17 -Iinclude examples/rd132328.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
 
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
