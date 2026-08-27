@@ -3,7 +3,7 @@ CXX ?= c++
 AR ?= ar
 PREFIX ?= /usr/local
 
-CPPFLAGS += -Iinclude
+CPPFLAGS += -Iinclude -D_POSIX_C_SOURCE=200809L
 CFLAGS ?= -O2
 CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
 
