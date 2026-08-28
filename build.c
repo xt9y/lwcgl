@@ -29,11 +29,20 @@ static void lwcgl_link_platform(C_Target *target) {
 #endif
 }
 
-static C_Target *lwcgl_test(C_Build *b, const char *name, const char *source, C_Target *library) {
+static C_Target *lwcgl_test(C_Build *b, const char *name, const char *source) {
     C_Target *test = c_test(b, name);
     c_sources(test, source);
+
+    /*
+     * Build the implementation into contract targets directly. C-BuildSystem
+     * currently orders system libraries before linked static target archives on
+     * GNU ld, which drops GLFW before liblwcgl.a is scanned. The real static
+     * library remains the default build artifact; contracts exercise the exact
+     * same source files while keeping Linux and macOS behavior identical.
+     */
+    c_sources(test, "src/*.c");
+
     lwcgl_compile_settings(test);
-    c_link_target(test, library);
     lwcgl_link_platform(test);
     return test;
 }
@@ -48,24 +57,21 @@ void build(C_Build *b) {
     C_Target *version = lwcgl_test(
         b,
         "version-contract",
-        "tests/version_contract.c",
-        lwcgl
+        "tests/version_contract.c"
     );
     c_standard(version, C_STANDARD_C11);
 
     C_Target *contract_c = lwcgl_test(
         b,
         "lwjgl3-contract-c",
-        "tests/lwjgl3_contract.c",
-        lwcgl
+        "tests/lwjgl3_contract.c"
     );
     c_standard(contract_c, C_STANDARD_C11);
 
     C_Target *contract_cpp = lwcgl_test(
         b,
         "lwjgl3-contract-cpp",
-        "tests/lwjgl3_contract.cpp",
-        lwcgl
+        "tests/lwjgl3_contract.cpp"
     );
     c_flag(contract_cpp, "-std=c++17");
 }
