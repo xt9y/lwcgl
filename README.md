@@ -1,6 +1,6 @@
 # lwcgl
 
-`lwcgl` is a native C/C++ implementation of the programming model exposed by LWJGL. The active `main` line tracks **LWJGL 3.4.2** and exposes a C ABI shaped around the modern LWJGL 3 modules instead of the removed LWJGL 2 `Display` / `Keyboard` / `Mouse` API.
+`lwcgl` is a native C/C++ implementation of the programming model exposed by LWJGL. The active **`v3.4.2`** line tracks **LWJGL 3.4.2** and exposes a C ABI shaped around the modern LWJGL 3 modules instead of the removed LWJGL 2 `Display` / `Keyboard` / `Mouse` API.
 
 The previous LWJGL 2.9.3 compatibility implementation is preserved on the [`v2.9.3`](../../tree/v2.9.3) branch.
 
@@ -114,30 +114,74 @@ MemoryStack.stackPop(stack);
 
 ## Build
 
+lwcgl uses [C-BuildSystem](https://github.com/xt9y/C-BuildSystem) directly through `build.c`. There is no Makefile on the v3.4.2 branch.
+
 Required dependency:
 
 - GLFW 3 development package
-- `pkg-config`
-- C11 compiler
+- C-BuildSystem (`c`)
+- C11/C++17 toolchain
 
-Build and run the compile/runtime contracts:
-
-```sh
-make check
-```
-
-Install:
+Build the static library:
 
 ```sh
-sudo make install
+c build
 ```
 
-The default prefix is `/usr/local`.
+The debug artifact is:
+
+```text
+build/debug/liblwcgl.a
+```
+
+Run all C and C++ contracts:
+
+```sh
+c test
+```
+
+Clean, rebuild and test in one command:
+
+```sh
+c clean build test
+```
+
+Release build:
+
+```sh
+c build --release
+```
+
+Install the debug build to `/usr/local`:
+
+```sh
+c build
+sudo sh scripts/install.sh
+```
+
+Install a release build:
+
+```sh
+c build --release
+sudo PROFILE=release sh scripts/install.sh
+```
+
+Custom prefixes remain supported:
+
+```sh
+sudo PREFIX=/opt/lwcgl sh scripts/install.sh
+```
+
+Uninstall:
+
+```sh
+sudo sh scripts/uninstall.sh
+```
 
 ## Branch policy
 
 - `v2.9.3` — frozen LWJGL 2.9.3 / RubyDung compatibility line
-- `main` — current LWJGL-compatible implementation; currently `v3.4.2`
+- `v3.4.2` — LWJGL 3.4.2-compatible implementation
 
 Do not port LWJGL 2 projects by replacing only the include path. Their window/input code should either stay on `v2.9.3` or be migrated to the GLFW model used by LWJGL 3.
 
