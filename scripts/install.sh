@@ -8,7 +8,11 @@ LIB="build/$PROFILE/liblwcgl.a"
 
 if [ ! -f "$LIB" ]; then
     echo "error: $LIB does not exist" >&2
-    echo "run: c build${PROFILE:+ --$PROFILE}" >&2
+    if [ "$PROFILE" = "release" ]; then
+        echo "run: c build --release" >&2
+    else
+        echo "run: c build" >&2
+    fi
     exit 1
 fi
 
