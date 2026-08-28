@@ -3,6 +3,13 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+/* GLFW uses GLFWAPI as an export/import macro. lwcgl uses it as the public
+ * table type name, so discard the native header macro after its declarations
+ * have been parsed. */
+#ifdef GLFWAPI
+#undef GLFWAPI
+#endif
+
 /*
  * Keep this positional. The public API intentionally uses LWJGL-style names
  * such as GLFW.GLFW_TRUE; including glfw3.h here turns those names into C
