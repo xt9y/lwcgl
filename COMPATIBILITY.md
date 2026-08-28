@@ -1,96 +1,162 @@
-# LWJGL 2.9.3 compatibility
+# lwcgl v3.4.2 compatibility
 
-The reference version is LWJGL **2.9.3**. The goal of lwcgl is native behavioral compatibility through a C ABI, with source-shaped singleton APIs for code that originally used LWJGL's static Java classes.
+## Version target
 
-## Compatibility levels
+`main` targets the programming model of **LWJGL 3.4.2**. The previous LWJGL 2.9.3 implementation is preserved unchanged on `v2.9.3`.
 
-- **Exact-shaped**: a C++ port can keep the LWJGL-looking call shape, for example `Display.create()` or `Keyboard.isKeyDown(Keyboard.KEY_W)`.
-- **Native-equivalent**: the operation has the same native effect but Java-only syntax or object behavior cannot be represented literally by C.
-- **Planned**: part of the 2.9.3 compatibility target but not implemented yet.
+This version is intentionally not source-compatible with the old `Display`, `Keyboard`, `Mouse`, `BufferUtils` and fixed-function RubyDung facade on `main`, because those are LWJGL 2 concepts. Use `v2.9.3` for that code.
 
-## Implemented core
+## Compatibility principle
 
-| LWJGL 2.9.3 surface | Status | Native backend |
-| --- | --- | --- |
-| `DisplayMode(int,int)` | Exact-shaped for C++ via a C macro | C aggregate |
-| `Display` basic lifecycle | Exact-shaped | GLFW |
-| `Display.update/processMessages` | Exact-shaped | GLFW |
-| `Display` mode enumeration | Native-equivalent | GLFW monitor modes |
-| `Display` fullscreen/windowed | Exact-shaped | GLFW |
-| `Display` title/location/resizable/vsync | Exact-shaped | GLFW |
-| `Keyboard` full LWJGL2 numeric key-code namespace | Exact-shaped | GLFW mapping |
-| `Keyboard.isKeyDown` | Exact-shaped | GLFW polling |
-| `Keyboard.next` event queue | Exact-shaped | GLFW callbacks |
-| `Keyboard` repeat events | Exact-shaped | GLFW callbacks |
-| `Mouse` lifecycle/grab | Exact-shaped | GLFW |
-| `Mouse` absolute + relative motion | Exact-shaped | GLFW callbacks |
-| `Mouse.next` event queue | Exact-shaped | GLFW callbacks |
-| `Mouse` wheel/buttons | Exact-shaped | GLFW callbacks |
-| `BufferUtils` native buffers | Exact-shaped factory API | C heap |
-| Buffer clear/flip/rewind/position/limit | Native-equivalent | C heap |
-| GL11 fixed-function functions already present in C OpenGL | Native-equivalent/direct | system OpenGL |
-| GL11 NIO-buffer overloads used by RubyDung | Exact-shaped macros/helpers | system OpenGL |
-| GLU perspective | direct native call | system GLU |
-| GLU NIO-buffer overloads used by RubyDung | Exact-shaped macros/helpers | system GLU |
-| `Sys` version/timer/alert basics | Exact-shaped | libc/platform timer |
+LWJGL 3 is a Java native-binding toolkit. In Java, generated classes wrap C APIs and manage native addresses, callbacks and off-heap memory. In a native C library, the closest equivalent is:
 
-## RubyDung / rd-132328 strict target
+1. preserve the LWJGL module/class organization where it remains useful (`GLFW`, `GL`, `GL11` ... `GL46`, `MemoryUtil`, `MemoryStack`);
+2. expose native C handles and callback signatures directly;
+3. resolve OpenGL functions from the active context like LWJGL's `GL.createCapabilities()`;
+4. avoid inventing Java-only behavior where C already provides the native primitive.
 
-The compatibility path intentionally supports the old renderer rather than translating it to modern OpenGL. That includes compatibility-context functionality such as fixed-function matrices, fog, selection mode, client-side arrays, quads and GLU.
+## Implemented on main
 
-Examples that remain source-shaped in C++:
+### Core/version
 
-```cpp
-Display.setDisplayMode(new DisplayMode(1024, 768));
-Display.create();
-Keyboard.create();
-Mouse.create();
-Mouse.setGrabbed(true);
+- compile-time `LWCGL_VERSION_*` = 3.4.2
+- runtime `LWCGL.getVersion*()`
+- thread-local last-error string for lwcgl-owned failures
 
-if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-    // ...
-}
+### `org.lwjgl.glfw.GLFW` model
 
-while (Mouse.next()) {
-    int button = Mouse.getEventButton();
-}
-```
+Implemented C table: `GLFW`.
 
-The legacy GL buffer overload compatibility includes:
+Covered areas:
 
-```cpp
-glFog(GL_FOG_COLOR, fogColor);
-glGetInteger(GL_VIEWPORT, viewportBuffer);
-glSelectBuffer(selectBuffer);
-GLuint texture = glGenTextures();
-glVertexPointer(3, 0, vertexBuffer);
-glTexCoordPointer(2, 0, textureCoordinateBuffer);
-glColorPointer(3, 0, colorBuffer);
-gluPickMatrix(x, y, 5.0, 5.0, viewportBuffer);
-```
+- initialization / termination / version
+- error callback
+- primary monitor and monitor callback
+- window hints and window lifecycle
+- context creation/current-context handling
+- swap interval and buffer swap
+- event polling/waiting/posting
+- window size, position, framebuffer size, content scale and opacity
+- iconify/restore/maximize/show/hide/focus/attention
+- window attributes and user pointers
+- window callbacks
+- keyboard, mouse and cursor-position input
+- input modes including raw mouse mode
+- input callbacks
+- joystick discovery/state/name/GUID/user pointer
+- gamepad mapping/name checks
+- clipboard
+- timer
+- OpenGL extension/procedure lookup
 
-## Full 2.9.3 target still to implement
+The public header intentionally defines opaque native handle aliases (`LWCGLFWwindow`, `LWCGLFWmonitor`) instead of exposing Java `long` handles.
 
-The following are part of the project target and are not yet complete:
+### `org.lwjgl.opengl.GL`
 
-- all remaining `org.lwjgl` utility/runtime classes
-- `Cursor`, `Controllers`, and controller enumeration
-- complete `Display` PixelFormat / ContextAttribs overload family
-- OpenGL 1.1 through the full 2.9.3 generated OpenGL binding surface and extension classes
-- OpenAL 1.0/1.1 and extension bindings
-- OpenCL binding surface
-- OpenGL ES / EGL binding surface
-- remaining `lwjgl_util` GLU, vector, geometry, shader, mapped-object and audio helpers
-- platform-specific cursor, clipboard and adapter details
+Implemented C table: `GL`.
 
-## Irreducible Java-to-C differences
+- `GL.createCapabilities()` requires a current GLFW OpenGL context
+- dynamically resolves entry points with `glfwGetProcAddress`
+- parses the context version
+- populates `GLCapabilities.OpenGL11` through `OpenGL46`
+- `GL.getCapabilities()` / `GL.setCapabilities()` are thread-local
+- explicit `GL.destroyCapabilities()` is required because C has no GC
+- arbitrary function lookup via `GL.getFunctionAddress()` / `GL.isFunctionAvailable()`
 
-A pure C ABI cannot literally reproduce Java language/runtime features. These differences are architectural rather than missing native functionality:
+### OpenGL class progression
 
-1. **Method overloading.** C has one symbol/signature per function pointer. Where practical, lwcgl uses macros or explicit suffixed entry points to preserve the common source shape.
-2. **Instance methods with implicit `this`.** C buffer operations require the buffer pointer to be supplied to the native operation; there is no hidden object receiver.
-3. **Exceptions.** C entry points return error codes and `lwcglGetLastError()` instead of throwing `LWJGLException`.
-4. **Garbage collection / Java object ownership.** Native allocations have explicit ownership. The literal C++ expression `new DisplayMode(...)` is accepted for source similarity, but a C implementation cannot legally `delete` a C++ allocation; callers wanting strict ownership should use a stack `DisplayMode` and pass its address.
-5. **AWT/Applet integration, reflection and Java callbacks.** These require platform-native equivalents rather than literal Java object compatibility.
+Function tables and representative constants exist for:
 
-These limitations do not require a JVM and do not change the legacy OpenGL rendering path used by `rd-132328`.
+| LWJGL class | Native coverage |
+| --- | --- |
+| `GL11` | core state, textures, draw, query/readback |
+| `GL12` | range draws, 3D textures |
+| `GL13` | active texture, multisample, compressed texture upload |
+| `GL14` | blend equation/separate blend, point parameters |
+| `GL15` | buffers, mapping, occlusion/query objects |
+| `GL20` | shaders, programs, uniforms, vertex attributes |
+| `GL21` | non-square matrix uniforms |
+| `GL30` | VAO, FBO/RBO, mapped ranges, mipmaps, blit/MSAA storage |
+| `GL31` | instancing, copy buffers, uniform blocks |
+| `GL32` | sync objects and base-vertex drawing |
+| `GL33` | attribute divisors, samplers, timer queries |
+| `GL40` | indirect draws, tessellation patch state, indexed blending |
+| `GL41` | program pipelines and program uniforms |
+| `GL42` | barriers, immutable texture storage, image binding |
+| `GL43` | compute, debug output, object labels |
+| `GL44` | buffer storage, multi-bind, clear texture image |
+| `GL45` | direct-state-access subset, clip control |
+| `GL46` | SPIR-V specialization, indirect-count draws |
+
+The tables are loaded even when a context is older. Callers must check the corresponding `GLCapabilities` flag and/or function pointer before using a newer entry point.
+
+### `org.lwjgl.system.MemoryUtil`
+
+Implemented table: `MemoryUtil`.
+
+- `memAlloc`
+- `memCalloc`
+- `memRealloc`
+- `memFree`
+- pointer/address conversion
+- native ASCII/UTF-8 null-terminated copies
+- null-terminated byte length
+
+### `org.lwjgl.system.MemoryStack`
+
+Implemented table: `MemoryStack`.
+
+- thread-local stack frames
+- `stackPush()` / capacity override
+- LIFO `stackPop()`
+- aligned frame allocation
+- zeroed allocation
+- scoped ASCII/UTF-8 copies
+- pointer/capacity introspection
+
+Java's `try (MemoryStack stack = stackPush())` maps to explicit `stackPush` / `stackPop` in C.
+
+## Native-language differences
+
+These are deliberate differences, not missing emulation:
+
+- Java classes become C API tables.
+- Java `long` native handles become typed C pointers where possible.
+- Java NIO buffers are not recreated; native pointers and C allocations are used.
+- Java exceptions become return values plus `lwcglGetLastError()` for lwcgl-owned operations.
+- Java GC/AutoCloseable cleanup becomes explicit C cleanup.
+- Java overloads are represented by native C signatures instead of artificial overload dispatch.
+- Java callback objects become native function pointers.
+
+## Optional LWJGL binding families
+
+LWJGL 3.4.2 contains many generated bindings beyond the core surface above. They are not all re-wrapped as lwcgl tables yet. This includes, among others:
+
+- Vulkan / shaderc / SPIR-V tooling
+- OpenAL
+- OpenCL
+- stb
+- Assimp
+- bgfx
+- Nuklear
+- OpenXR
+- FreeType / HarfBuzz
+- meshoptimizer
+- KTX
+- LLVM
+- libffi
+- LMDB
+- mimalloc / jemalloc
+- SDL 3
+- RenderDoc
+
+In C/C++, these libraries already expose their canonical native APIs, so applications can link them directly while using lwcgl for GLFW/OpenGL/memory. Future lwcgl modules should only add value where a consistent LWJGL-shaped table, loader or compatibility behavior is useful.
+
+## CI contracts
+
+`make check` verifies:
+
+- v3.4.2 compile-time and runtime version identity
+- C compilation of the GLFW + capabilities + modern buffer/shader/VAO surface
+- C++17 consumption of the same C ABI
+- Linux and macOS builds
