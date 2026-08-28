@@ -9,16 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev pkg-config
+      - name: Install lwcgl dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev
+      - name: Install C-BuildSystem
+        run: |
+          git clone --depth 1 https://github.com/xt9y/C-BuildSystem.git /tmp/C-BuildSystem
+          make -C /tmp/C-BuildSystem
+          sudo make -C /tmp/C-BuildSystem install
       - name: Build and test lwcgl
-        run: make check
+        run: c clean build test
 
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
+      - name: Install lwcgl dependencies
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install glfw
+      - name: Install C-BuildSystem
+        run: |
+          git clone --depth 1 https://github.com/xt9y/C-BuildSystem.git /tmp/C-BuildSystem
+          make -C /tmp/C-BuildSystem
+          sudo make -C /tmp/C-BuildSystem install
       - name: Build and test lwcgl
-        run: make check
+        run: c clean build test
