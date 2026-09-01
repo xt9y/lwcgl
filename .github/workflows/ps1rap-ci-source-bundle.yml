@@ -1,0 +1,36 @@
+name: PS1RAP CI Source Bundle
+
+on:
+  push:
+    branches: [v3.4.2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout complete repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create verified Git bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ps1rap-ci
+          git bundle create ps1rap-ci/lwcgl.bundle --all
+          git bundle verify ps1rap-ci/lwcgl.bundle
+          git cat-file -e 44e01b6a641ade528ad7bf13b561846162ae063c^{commit}
+          git cat-file -e 7dcb87a15b8e60dc81457e603b319067a298f94e^{commit}
+          sha256sum ps1rap-ci/lwcgl.bundle > ps1rap-ci/SHA256SUMS
+          git rev-parse HEAD > ps1rap-ci/HEAD
+      - name: Upload source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps1rap-lwcgl-source
+          path: ps1rap-ci/
+          if-no-files-found: error
+          retention-days: 30
