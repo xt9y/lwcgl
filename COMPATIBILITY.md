@@ -34,8 +34,6 @@ The reference version is LWJGL **2.9.3**. The goal of lwcgl is native behavioral
 | GLU NIO-buffer overloads used by RubyDung | Exact-shaped macros/helpers | system GLU |
 | `Sys` version/timer/alert basics | Exact-shaped | libc/platform timer |
 
-## RubyDung / rd-132328 strict target
-
 The compatibility path intentionally supports the old renderer rather than translating it to modern OpenGL. That includes compatibility-context functionality such as fixed-function matrices, fog, selection mode, client-side arrays, quads and GLU.
 
 Examples that remain source-shaped in C++:
