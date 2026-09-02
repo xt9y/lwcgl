@@ -1,5 +1,7 @@
 #define LWCGL_IMPLEMENTATION
 #include <lwcgl/lwcgl.h>
+#include <lwcgl/context.h>
+#include <lwcgl/glmodern.h>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -19,6 +21,37 @@ static LWCGLbool g_modern_available;
 static char g_missing_function[96];
 static int g_gl_major;
 static int g_gl_minor;
+
+static int g_requested_major = 2;
+static int g_requested_minor = 1;
+static int g_requested_profile = LWCGL_CONTEXT_ANY_PROFILE;
+static int g_requested_debug;
+
+void lwcglSetContextVersion(int major, int minor) {
+    if (major < 1 || minor < 0) {
+        g_requested_major = 2;
+        g_requested_minor = 1;
+        return;
+    }
+    g_requested_major = major;
+    g_requested_minor = minor;
+}
+
+void lwcglSetContextProfile(int profile) {
+    if (profile != LWCGL_CONTEXT_CORE_PROFILE &&
+        profile != LWCGL_CONTEXT_COMPATIBILITY_PROFILE)
+        profile = LWCGL_CONTEXT_ANY_PROFILE;
+    g_requested_profile = profile;
+}
+
+void lwcglSetContextDebug(int enabled) {
+    g_requested_debug = enabled ? 1 : 0;
+}
+
+int lwcglRequestedContextMajorVersion(void) { return g_requested_major; }
+int lwcglRequestedContextMinorVersion(void) { return g_requested_minor; }
+int lwcglRequestedContextProfile(void) { return g_requested_profile; }
+int lwcglRequestedContextDebug(void) { return g_requested_debug; }
 
 static void clear_tables(void) {
     memset(&GL15, 0, sizeof(GL15));
@@ -50,18 +83,12 @@ static GLFWglproc resolve_proc(const char *name) {
 } while (0)
 
 static void read_version(void) {
-    GLint major = 0;
-    GLint minor = 0;
+    const char *version = (const char *)glGetString(GL_VERSION);
+    int major = 0;
+    int minor = 0;
 
-    /* GL_MAJOR_VERSION/GL_MINOR_VERSION are core from OpenGL 3.0 onward. */
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-
-    if (major <= 0) {
-        const char *version = (const char *)glGetString(GL_VERSION);
-        if (version)
-            (void)sscanf(version, "%d.%d", &major, &minor);
-    }
+    if (version)
+        (void)sscanf(version, "%d.%d", &major, &minor);
 
     g_gl_major = major;
     g_gl_minor = minor;
@@ -146,6 +173,11 @@ int lwcglLoadModernGL(void) {
     if (g_missing_function[0])
         return -1;
 
+    if (g_gl_major < 4 || (g_gl_major == 4 && g_gl_minor < 3)) {
+        remember_missing("OpenGL 4.3 context");
+        return -1;
+    }
+
     g_modern_available = LWCGL_TRUE;
     return 0;
 }
@@ -164,4 +196,35 @@ int lwcglModernGLMajorVersion(void) {
 
 int lwcglModernGLMinorVersion(void) {
     return g_gl_minor;
+}
+
+/*
+ * src/lwcgl.c is compiled with glfwCreateWindow redirected to this symbol.
+ * Its existing 2.1 hints are overwritten here only when the caller requests
+ * a different context, preserving the old behavior by default.
+ */
+GLFWwindow *lwcgl_glfwCreateWindow(int width, int height, const char *title,
+                                   GLFWmonitor *monitor, GLFWwindow *share) {
+    GLFWwindow *window;
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, g_requested_major);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, g_requested_minor);
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, g_requested_debug ? GLFW_TRUE : GLFW_FALSE);
+
+    if (g_requested_major > 3 || (g_requested_major == 3 && g_requested_minor >= 2)) {
+        if (g_requested_profile == LWCGL_CONTEXT_CORE_PROFILE)
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        else if (g_requested_profile == LWCGL_CONTEXT_COMPATIBILITY_PROFILE)
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+        else
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
+    }
+
+    window = glfwCreateWindow(width, height, title, monitor, share);
+    if (!window)
+        return NULL;
+
+    glfwMakeContextCurrent(window);
+    (void)lwcglLoadModernGL();
+    return window;
 }
