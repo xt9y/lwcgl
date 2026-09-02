@@ -12,6 +12,8 @@
 GL15API GL15;
 GL20API GL20;
 GL30API GL30;
+GL31API GL31;
+GL32API GL32;
 GL33API GL33;
 GL42API GL42;
 GL43API GL43;
@@ -57,6 +59,8 @@ static void clear_tables(void) {
     memset(&GL15, 0, sizeof(GL15));
     memset(&GL20, 0, sizeof(GL20));
     memset(&GL30, 0, sizeof(GL30));
+    memset(&GL31, 0, sizeof(GL31));
+    memset(&GL32, 0, sizeof(GL32));
     memset(&GL33, 0, sizeof(GL33));
     memset(&GL42, 0, sizeof(GL42));
     memset(&GL43, 0, sizeof(GL43));
@@ -108,6 +112,7 @@ int lwcglLoadModernGL(void) {
     LWCGL_LOAD(GL15, glBindBuffer, glBindBuffer);
     LWCGL_LOAD(GL15, glBufferData, glBufferData);
     LWCGL_LOAD(GL15, glBufferSubData, glBufferSubData);
+    LWCGL_LOAD(GL15, glGetBufferSubData, glGetBufferSubData);
 
     LWCGL_LOAD(GL20, glCreateShader, glCreateShader);
     LWCGL_LOAD(GL20, glShaderSource, glShaderSource);
@@ -146,12 +151,23 @@ int lwcglLoadModernGL(void) {
     LWCGL_LOAD(GL30, glFramebufferTextureLayer, glFramebufferTextureLayer);
     LWCGL_LOAD(GL30, glCheckFramebufferStatus, glCheckFramebufferStatus);
     LWCGL_LOAD(GL30, glBlitFramebuffer, glBlitFramebuffer);
+    LWCGL_LOAD(GL30, glClearBufferfv, glClearBufferfv);
     LWCGL_LOAD(GL30, glGenerateMipmap, glGenerateMipmap);
     LWCGL_LOAD(GL30, glBindBufferBase, glBindBufferBase);
     LWCGL_LOAD(GL30, glMapBufferRange, glMapBufferRange);
     LWCGL_LOAD(GL30, glFlushMappedBufferRange, glFlushMappedBufferRange);
     LWCGL_LOAD(GL30, glUnmapBuffer, glUnmapBuffer);
 
+    LWCGL_LOAD(GL31, glDrawArraysInstanced, glDrawArraysInstanced);
+    LWCGL_LOAD(GL31, glDrawElementsInstanced, glDrawElementsInstanced);
+    LWCGL_LOAD(GL31, glCopyBufferSubData, glCopyBufferSubData);
+
+    LWCGL_LOAD(GL32, glFenceSync, glFenceSync);
+    LWCGL_LOAD(GL32, glClientWaitSync, glClientWaitSync);
+    LWCGL_LOAD(GL32, glWaitSync, glWaitSync);
+    LWCGL_LOAD(GL32, glDeleteSync, glDeleteSync);
+
+    LWCGL_LOAD(GL33, glVertexAttribDivisor, glVertexAttribDivisor);
     LWCGL_LOAD(GL33, glGenQueries, glGenQueries);
     LWCGL_LOAD(GL33, glDeleteQueries, glDeleteQueries);
     LWCGL_LOAD(GL33, glQueryCounter, glQueryCounter);
