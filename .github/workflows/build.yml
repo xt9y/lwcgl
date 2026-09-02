@@ -15,8 +15,8 @@ jobs:
         run: make
       - name: Compile direct C++ compatibility example
         run: make example
-      - name: Compile rd-132328 API contract
-        run: c++ -std=c++17 -Iinclude tests/rd132328_contract.cpp build/liblwcgl.a $(pkg-config --libs glfw3) -lGL -lGLU -lm -ldl -lpthread -o build/rd132328-contract
+      - name: Verify LWJGL 2.9.3 contracts
+        run: make check
 
   macos:
     runs-on: macos-latest
@@ -28,5 +28,5 @@ jobs:
         run: make
       - name: Compile direct C++ compatibility example
         run: make example
-      - name: Compile rd-132328 API contract
-        run: c++ -DGL_SILENCE_DEPRECATION -std=c++17 -Iinclude tests/rd132328_contract.cpp build/liblwcgl.a $(pkg-config --libs glfw3) -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo -o build/rd132328-contract
+      - name: Verify LWJGL 2.9.3 contracts
+        run: make check
