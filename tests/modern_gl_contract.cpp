@@ -16,6 +16,8 @@ static void compile_modern_gl_surface() {
     GLuint vao = 0;
     GL30.glGenVertexArrays(1, &vao);
     GL30.glBindVertexArray(vao);
+    GL33.glVertexAttribDivisor(0, 1);
+    GL31.glDrawArraysInstanced(GL_TRIANGLES, 0, 3, 1);
 
     GLuint vertex = GL20.glCreateShader(GL_VERTEX_SHADER);
     GLuint fragment = GL20.glCreateShader(GL_FRAGMENT_SHADER);
@@ -36,6 +38,10 @@ static void compile_modern_gl_surface() {
     GL42.glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
     GL43.glDispatchCompute(1, 1, 1);
     GL42.glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+    LWCGLsync sync = GL32.glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (sync)
+        GL32.glDeleteSync(sync);
 
     GLuint query = 0;
     GL33.glGenQueries(1, &query);
