@@ -116,7 +116,7 @@ MemoryStack.stackPop(stack);
 
 ## Build
 
-The normal v3.4.2 workflow is Make-based, matching the v2.9.3 branch.
+The v3.4.2 workflow is Makefile-only, matching the v2.9.3 branch.
 
 Required dependencies:
 
@@ -174,8 +174,6 @@ Uninstall:
 ```sh
 sudo make uninstall
 ```
-
-`build.c` remains available for projects that want to build lwcgl through [C-BuildSystem](https://github.com/xt9y/C-BuildSystem), but it is no longer required for the normal build/install workflow.
 
 ## Branch policy
 
