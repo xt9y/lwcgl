@@ -10,25 +10,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install lwcgl dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev
-      - name: Install C-BuildSystem
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libglfw3-dev
+      - name: Build lwcgl
+        run: make clean && make
+      - name: Test lwcgl
+        run: make test
+      - name: Verify install and uninstall targets
         run: |
-          git clone --depth 1 https://github.com/xt9y/C-BuildSystem.git /tmp/C-BuildSystem
-          make -C /tmp/C-BuildSystem
-          sudo make -C /tmp/C-BuildSystem install
-      - name: Build and test lwcgl
-        run: c clean build test
+          make DESTDIR="$RUNNER_TEMP/lwcgl-stage" install
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/lib/liblwcgl.a"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/lwcgl.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/memory.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/glfw.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/opengl.h"
+          make DESTDIR="$RUNNER_TEMP/lwcgl-stage" uninstall
+          test ! -e "$RUNNER_TEMP/lwcgl-stage/usr/local/lib/liblwcgl.a"
 
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install lwcgl dependencies
-        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install glfw
-      - name: Install C-BuildSystem
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
+      - name: Build lwcgl
+        run: make clean && make
+      - name: Test lwcgl
+        run: make test
+      - name: Verify install and uninstall targets
         run: |
-          git clone --depth 1 https://github.com/xt9y/C-BuildSystem.git /tmp/C-BuildSystem
-          make -C /tmp/C-BuildSystem
-          sudo make -C /tmp/C-BuildSystem install
-      - name: Build and test lwcgl
-        run: c clean build test
+          make DESTDIR="$RUNNER_TEMP/lwcgl-stage" install
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/lib/liblwcgl.a"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/lwcgl.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/memory.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/glfw.h"
+          test -f "$RUNNER_TEMP/lwcgl-stage/usr/local/include/lwcgl/opengl.h"
+          make DESTDIR="$RUNNER_TEMP/lwcgl-stage" uninstall
+          test ! -e "$RUNNER_TEMP/lwcgl-stage/usr/local/lib/liblwcgl.a"

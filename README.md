@@ -116,69 +116,66 @@ MemoryStack.stackPop(stack);
 
 ## Build
 
-lwcgl uses [C-BuildSystem](https://github.com/xt9y/C-BuildSystem) directly through `build.c`. There is no Makefile on the v3.4.2 branch.
+The normal v3.4.2 workflow is Make-based, matching the v2.9.3 branch.
 
-Required dependency:
+Required dependencies:
 
 - GLFW 3 development package
-- C-BuildSystem (`c`)
+- `pkg-config`
+- Make
 - C11/C++17 toolchain
+
+On supported systems, dependencies can be installed with:
+
+```sh
+make deps
+```
 
 Build the static library:
 
 ```sh
-c build
+make
 ```
 
-The debug artifact is:
+The artifact is:
 
 ```text
-build/debug/liblwcgl.a
+build/liblwcgl.a
 ```
 
-Run all C and C++ contracts:
+Run the C and C++ compatibility contracts:
 
 ```sh
-c test
+make test
 ```
 
-Clean, rebuild and test in one command:
+Clean the build:
 
 ```sh
-c clean build test
+make clean
 ```
 
-Release build:
+Build and install to `/usr/local`:
 
 ```sh
-c build --release
+make
+sudo make install
 ```
 
-Install the debug build to `/usr/local`:
+Install to a custom prefix:
 
 ```sh
-c build
-sudo sh scripts/install.sh
-```
-
-Install a release build:
-
-```sh
-c build --release
-sudo PROFILE=release sh scripts/install.sh
-```
-
-Custom prefixes remain supported:
-
-```sh
-sudo PREFIX=/opt/lwcgl sh scripts/install.sh
+make
+sudo make PREFIX=/opt/lwcgl install
 ```
 
 Uninstall:
 
 ```sh
-sudo sh scripts/uninstall.sh
+sudo make uninstall
 ```
+
+`build.c` remains available for projects that want to build lwcgl through [C-BuildSystem](https://github.com/xt9y/C-BuildSystem), but it is no longer required for the normal build/install workflow.
 
 ## Branch policy
 
