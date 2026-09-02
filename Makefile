@@ -24,9 +24,9 @@ LIBS := $(PKG_LIBS) $(PLATFORM_LIBS)
 
 BUILD := build
 LIB := $(BUILD)/liblwcgl.a
-OBJ := $(BUILD)/lwcgl.o $(BUILD)/gl11_compat.o
+OBJ := $(BUILD)/lwcgl.o $(BUILD)/gl11_compat.o $(BUILD)/glmodern.o
 
-.PHONY: all clean install uninstall example check-deps deps
+.PHONY: all clean install uninstall example check check-deps deps
 
 all: check-deps $(LIB)
 
@@ -90,11 +90,14 @@ endif
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(BUILD)/lwcgl.o: src/lwcgl.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/lwcgl.c -o $@
+$(BUILD)/lwcgl.o: src/lwcgl.c src/context_wrap.h include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
 
 $(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/gl11_compat.c -o $@
+
+$(BUILD)/glmodern.o: src/glmodern.c include/lwcgl/lwcgl.h include/lwcgl/context.h include/lwcgl/glmodern.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/glmodern.c -o $@
 
 $(LIB): $(OBJ)
 	$(AR) rcs $@ $^
@@ -102,16 +105,30 @@ $(LIB): $(OBJ)
 example: check-deps $(LIB)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Iinclude examples/rd132328.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
 
+$(BUILD)/rd132328-contract: tests/rd132328_contract.cpp $(LIB)
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/rd132328_contract.cpp $(LIB) $(LIBS) -o $@
+
+$(BUILD)/modern-gl-contract: tests/modern_gl_contract.cpp $(LIB)
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/modern_gl_contract.cpp $(LIB) $(LIBS) -o $@
+
+check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract
+	$(BUILD)/rd132328-contract
+	$(BUILD)/modern-gl-contract
+
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
 	install -m 0644 include/lwcgl/lwcgl.h $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
 	install -m 0644 include/lwcgl/gl11_compat.h $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
+	install -m 0644 include/lwcgl/context.h $(DESTDIR)$(PREFIX)/include/lwcgl/context.h
+	install -m 0644 include/lwcgl/glmodern.h $(DESTDIR)$(PREFIX)/include/lwcgl/glmodern.h
 	install -d $(DESTDIR)$(PREFIX)/lib
 	install -m 0644 $(LIB) $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
 	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
+	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/context.h
+	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/glmodern.h
 	rmdir $(DESTDIR)$(PREFIX)/include/lwcgl 2>/dev/null || true
 	rm -f $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
 
