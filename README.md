@@ -4,6 +4,8 @@
 
 The previous LWJGL 2.9.3 compatibility implementation is preserved on the [`v2.9.3`](../../tree/v2.9.3) branch.
 
+Docs (Thanks to AI): https://xt9y.de/lwcgl.html
+
 ## Current version
 
 ```text
