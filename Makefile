@@ -103,7 +103,7 @@ $(LIB): $(OBJ)
 	$(AR) rcs $@ $^
 
 example: check-deps $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Iinclude examples/rd132328.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
+	$(CXX) $(CPPFLAGS) -std=c++17 -Iinclude tests/rd132328_contract.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
 
 $(BUILD)/rd132328-contract: tests/rd132328_contract.cpp $(LIB)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/rd132328_contract.cpp $(LIB) $(LIBS) -o $@
