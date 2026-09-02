@@ -11,21 +11,28 @@ extern "C" {
 /*
  * Modern OpenGL surface used by LWJGL 2.9.3-era applications.
  *
- * LWJGL 2.9.3 exposes GL15/20/30/33/42/43 classes.  Native C OpenGL
+ * LWJGL 2.9.3 exposes GL15/20/30/31/32/33/42/43 classes. Native C OpenGL
  * headers are deliberately not relied on for post-1.1 prototypes because
- * their availability differs by platform.  These function tables are loaded
+ * their availability differs by platform. These function tables are loaded
  * from the current GLFW context with glfwGetProcAddress().
  */
 
 typedef ptrdiff_t LWCGLintptr;
 typedef ptrdiff_t LWCGLsizeiptr;
 typedef uint64_t LWCGLGLuint64;
+typedef struct LWCGLsyncOpaque *LWCGLsync;
 
 #ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER 0x8892
 #endif
 #ifndef GL_ELEMENT_ARRAY_BUFFER
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
+#endif
+#ifndef GL_COPY_READ_BUFFER
+#define GL_COPY_READ_BUFFER 0x8F36
+#endif
+#ifndef GL_COPY_WRITE_BUFFER
+#define GL_COPY_WRITE_BUFFER 0x8F37
 #endif
 #ifndef GL_PIXEL_PACK_BUFFER
 #define GL_PIXEL_PACK_BUFFER 0x88EB
@@ -225,14 +232,29 @@ typedef uint64_t LWCGLGLuint64;
 #ifndef GL_QUERY_RESULT_AVAILABLE
 #define GL_QUERY_RESULT_AVAILABLE 0x8867
 #endif
+#ifndef GL_SYNC_GPU_COMMANDS_COMPLETE
+#define GL_SYNC_GPU_COMMANDS_COMPLETE 0x9117
+#endif
+#ifndef GL_ALREADY_SIGNALED
+#define GL_ALREADY_SIGNALED 0x911A
+#endif
+#ifndef GL_TIMEOUT_EXPIRED
+#define GL_TIMEOUT_EXPIRED 0x911B
+#endif
+#ifndef GL_CONDITION_SATISFIED
+#define GL_CONDITION_SATISFIED 0x911C
+#endif
+#ifndef GL_WAIT_FAILED
+#define GL_WAIT_FAILED 0x911D
+#endif
+#ifndef GL_SYNC_FLUSH_COMMANDS_BIT
+#define GL_SYNC_FLUSH_COMMANDS_BIT 0x00000001
+#endif
 #ifndef GL_MAJOR_VERSION
 #define GL_MAJOR_VERSION 0x821B
 #endif
 #ifndef GL_MINOR_VERSION
 #define GL_MINOR_VERSION 0x821C
-#endif
-#ifndef GL_NUM_EXTENSIONS
-#define GL_NUM_EXTENSIONS 0x821D
 #endif
 
 /* GL15: buffer objects. */
@@ -242,6 +264,7 @@ typedef struct GL15API {
     void (*glBindBuffer)(GLenum target, GLuint buffer);
     void (*glBufferData)(GLenum target, LWCGLsizeiptr size, const void *data, GLenum usage);
     void (*glBufferSubData)(GLenum target, LWCGLintptr offset, LWCGLsizeiptr size, const void *data);
+    void (*glGetBufferSubData)(GLenum target, LWCGLintptr offset, LWCGLsizeiptr size, void *data);
 } GL15API;
 
 /* GL20: programmable shaders, uniforms, vertex attributes and MRT. */
@@ -292,6 +315,7 @@ typedef struct GL30API {
     void (*glBlitFramebuffer)(GLint src_x0, GLint src_y0, GLint src_x1, GLint src_y1,
                               GLint dst_x0, GLint dst_y0, GLint dst_x1, GLint dst_y1,
                               GLbitfield mask, GLenum filter);
+    void (*glClearBufferfv)(GLenum buffer, GLint draw_buffer, const GLfloat *value);
     void (*glGenerateMipmap)(GLenum target);
 
     void (*glBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
@@ -300,8 +324,26 @@ typedef struct GL30API {
     GLboolean (*glUnmapBuffer)(GLenum target);
 } GL30API;
 
-/* GL33 subset used for GPU timer queries. */
+/* GL31: instanced draws and GPU-side buffer copies. */
+typedef struct GL31API {
+    void (*glDrawArraysInstanced)(GLenum mode, GLint first, GLsizei count, GLsizei instances);
+    void (*glDrawElementsInstanced)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instances);
+    void (*glCopyBufferSubData)(GLenum read_target, GLenum write_target,
+                                LWCGLintptr read_offset, LWCGLintptr write_offset,
+                                LWCGLsizeiptr size);
+} GL31API;
+
+/* GL32: fence synchronization for non-blocking streaming rings. */
+typedef struct GL32API {
+    LWCGLsync (*glFenceSync)(GLenum condition, GLbitfield flags);
+    GLenum (*glClientWaitSync)(LWCGLsync sync, GLbitfield flags, LWCGLGLuint64 timeout);
+    void (*glWaitSync)(LWCGLsync sync, GLbitfield flags, LWCGLGLuint64 timeout);
+    void (*glDeleteSync)(LWCGLsync sync);
+} GL32API;
+
+/* GL33: vertex divisors and GPU timer queries. */
 typedef struct GL33API {
+    void (*glVertexAttribDivisor)(GLuint index, GLuint divisor);
     void (*glGenQueries)(GLsizei count, GLuint *queries);
     void (*glDeleteQueries)(GLsizei count, const GLuint *queries);
     void (*glQueryCounter)(GLuint query, GLenum target);
@@ -323,7 +365,7 @@ typedef struct GL43API {
     void (*glDispatchComputeIndirect)(LWCGLintptr indirect);
 } GL43API;
 
-/* Common post-GL11 functions that are not naturally owned by the groups above. */
+/* Common post-GL11 functions not naturally owned by the groups above. */
 typedef struct GLModernAPI {
     void (*glActiveTexture)(GLenum texture);
     void (*glTexImage3D)(GLenum target, GLint level, GLint internal_format,
@@ -338,6 +380,8 @@ typedef struct GLModernAPI {
 extern GL15API GL15;
 extern GL20API GL20;
 extern GL30API GL30;
+extern GL31API GL31;
+extern GL32API GL32;
 extern GL33API GL33;
 extern GL42API GL42;
 extern GL43API GL43;
