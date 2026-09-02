@@ -30,6 +30,8 @@ int main() {
 
 `DisplayMode(...)` is a function-like compatibility macro defined by the C header. In C++ it expands to aggregate initialization, so `new DisplayMode(1024, 768)` remains valid without introducing a C++ wrapper.
 
+Docs (Thanks to AI): https://xt9y.de/lwcgl.html
+
 ## Architecture
 
 ```text
