@@ -1,9 +1,11 @@
 #include <lwcgl/lwcgl.h>
+#include <lwcgl/context.h>
+#include <lwcgl/glmodern.h>
 
 static void compile_modern_gl_surface() {
-    Display.setContextVersion(4, 3);
-    Display.setContextProfile(LWCGL_CONTEXT_COMPATIBILITY_PROFILE);
-    Display.setContextDebug(LWCGL_FALSE);
+    lwcglSetContextVersion(4, 3);
+    lwcglSetContextProfile(LWCGL_CONTEXT_COMPATIBILITY_PROFILE);
+    lwcglSetContextDebug(LWCGL_FALSE);
     Display.create();
 
     GLuint buffer = 0;
@@ -38,7 +40,7 @@ static void compile_modern_gl_surface() {
     GLuint query = 0;
     GL33.glGenQueries(1, &query);
     GL33.glQueryCounter(query, GL_TIMESTAMP);
-    GLuint64 timestamp = 0;
+    LWCGLGLuint64 timestamp = 0;
     GL33.glGetQueryObjectui64v(query, GL_QUERY_RESULT, &timestamp);
 
     GL33.glDeleteQueries(1, &query);
