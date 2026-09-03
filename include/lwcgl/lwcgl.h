@@ -331,6 +331,11 @@ extern SysAPI Sys;
 const char *lwcglGetLastError(void);
 void lwcglClearError(void);
 
+/* Equivalent to LWJGL Display.update(false): swap the current display buffers
+ * without polling OS/window/input events. Call Display.processMessages()
+ * separately when event processing is desired. Safe before Display.create(). */
+void lwcglDisplayUpdateNoMessages(void);
+
 #ifdef __cplusplus
 }
 #endif
