@@ -91,7 +91,7 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 $(BUILD)/lwcgl.o: src/lwcgl.c src/context_wrap.h include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Wno-missing-field-initializers -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
 
 $(BUILD)/display_ext.o: src/display_ext.c src/input_state.h include/lwcgl/lwcgl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/display_ext.c -o $@
