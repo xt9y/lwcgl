@@ -24,7 +24,7 @@ LIBS := $(PKG_LIBS) $(PLATFORM_LIBS)
 
 BUILD := build
 LIB := $(BUILD)/liblwcgl.a
-OBJ := $(BUILD)/lwcgl.o $(BUILD)/gl11_compat.o $(BUILD)/glmodern.o
+OBJ := $(BUILD)/lwcgl.o $(BUILD)/display_ext.o $(BUILD)/gl11_compat.o $(BUILD)/glmodern.o
 
 .PHONY: all clean install uninstall example check check-deps deps
 
@@ -93,6 +93,9 @@ $(BUILD):
 $(BUILD)/lwcgl.o: src/lwcgl.c src/context_wrap.h include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
 
+$(BUILD)/display_ext.o: src/display_ext.c include/lwcgl/lwcgl.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/display_ext.c -o $@
+
 $(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/gl11_compat.c -o $@
 
@@ -111,9 +114,13 @@ $(BUILD)/rd132328-contract: tests/rd132328_contract.cpp $(LIB)
 $(BUILD)/modern-gl-contract: tests/modern_gl_contract.cpp $(LIB)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/modern_gl_contract.cpp $(LIB) $(LIBS) -o $@
 
-check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract
+$(BUILD)/display-update-contract: tests/display_update_contract.cpp $(LIB)
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/display_update_contract.cpp $(LIB) $(LIBS) -o $@
+
+check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract
 	$(BUILD)/rd132328-contract
 	$(BUILD)/modern-gl-contract
+	$(BUILD)/display-update-contract
 
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
