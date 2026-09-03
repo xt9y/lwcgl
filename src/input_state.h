@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-#define LWCGL_INPUT_KEY_CAPACITY 256
+#define LWCGL_INPUT_KEY_CAPACITY 512
 
 typedef struct LwcglInputState {
     unsigned char key_down[LWCGL_INPUT_KEY_CAPACITY];
