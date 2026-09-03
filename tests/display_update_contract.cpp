@@ -1,10 +1,14 @@
 #include <lwcgl/lwcgl.h>
 
+#include <cassert>
+
 int main()
 {
-    /* This must be safe before Display.create(): the swap-only helper is a
-     * lightweight update(false)-style primitive that simply no-ops without a
-     * native window. */
+    assert(Display.updateNoMessages != nullptr);
+
+    /* Both entry points must be safe before Display.create(): the swap-only
+     * update primitive simply no-ops without a native window. */
+    Display.updateNoMessages();
     lwcglDisplayUpdateNoMessages();
     return 0;
 }
