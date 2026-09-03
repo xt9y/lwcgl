@@ -2,7 +2,10 @@ name: build
 
 on:
   push:
+    branches:
+      - ci-check
   pull_request:
+  workflow_dispatch:
 
 jobs:
   linux:
