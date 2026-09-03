@@ -12,7 +12,6 @@ static GLFWwindowclosefun g_chained_close_callback;
 
 static int (*g_base_display_create)(void);
 static void (*g_base_display_destroy)(void);
-static LWCGLbool (*g_base_display_close_requested)(void);
 static int (*g_base_keyboard_create)(void);
 static void (*g_base_keyboard_destroy)(void);
 static LWCGLbool (*g_base_keyboard_is_down)(int key);
@@ -167,7 +166,6 @@ void lwcglInstallFastRuntime(void)
 
     g_base_display_create = Display.create;
     g_base_display_destroy = Display.destroy;
-    g_base_display_close_requested = Display.isCloseRequested;
     g_base_keyboard_create = Keyboard.create;
     g_base_keyboard_destroy = Keyboard.destroy;
     g_base_keyboard_is_down = Keyboard.isKeyDown;
