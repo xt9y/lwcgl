@@ -93,7 +93,7 @@ $(BUILD):
 $(BUILD)/lwcgl.o: src/lwcgl.c src/context_wrap.h include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
 
-$(BUILD)/display_ext.o: src/display_ext.c include/lwcgl/lwcgl.h | $(BUILD)
+$(BUILD)/display_ext.o: src/display_ext.c src/input_state.h include/lwcgl/lwcgl.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/display_ext.c -o $@
 
 $(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
@@ -117,10 +117,14 @@ $(BUILD)/modern-gl-contract: tests/modern_gl_contract.cpp $(LIB)
 $(BUILD)/display-update-contract: tests/display_update_contract.cpp $(LIB)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/display_update_contract.cpp $(LIB) $(LIBS) -o $@
 
-check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract
+$(BUILD)/input-state-contract: tests/input_state_contract.cpp src/input_state.h | $(BUILD)
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/input_state_contract.cpp -o $@
+
+check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract $(BUILD)/input-state-contract
 	$(BUILD)/rd132328-contract
 	$(BUILD)/modern-gl-contract
 	$(BUILD)/display-update-contract
+	$(BUILD)/input-state-contract
 
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
