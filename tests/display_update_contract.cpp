@@ -4,6 +4,7 @@
 
 int main()
 {
+    lwcglInstallFastRuntime();
     assert(Display.updateNoMessages != nullptr);
 
     /* Both entry points must be safe before Display.create(): the swap-only
