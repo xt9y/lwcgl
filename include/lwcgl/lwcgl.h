@@ -123,6 +123,11 @@ typedef struct DisplayAPI {
 
     void (*sync)(int fps);
     void *(*getNativeWindow)(void);
+
+    /* Extension appended after the LWJGL2-compatible prefix so existing
+     * source/field layout remains unchanged. Installed by
+     * lwcglInstallFastRuntime(). */
+    void (*updateNoMessages)(void);
 } DisplayAPI;
 
 typedef struct KeyboardAPI {
@@ -330,6 +335,12 @@ extern SysAPI Sys;
 
 const char *lwcglGetLastError(void);
 void lwcglClearError(void);
+
+/* Install the optional runtime fast-path extension. This keeps the historical
+ * API table prefix source-compatible while enabling cached close/ESC state and
+ * the swap-only Display.updateNoMessages extension. Safe to call repeatedly
+ * and before Display.create(). */
+void lwcglInstallFastRuntime(void);
 
 /* Equivalent to LWJGL Display.update(false): swap the current display buffers
  * without polling OS/window/input events. Call Display.processMessages()
