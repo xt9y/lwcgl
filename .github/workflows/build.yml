@@ -1,21 +1,53 @@
-name: verify-v2-once
+name: verify
+
 on:
-  push:
-    branches: [v2.9.3]
-    paths: [.github/verify-now-v2]
+  workflow_dispatch:
+
 concurrency:
-  group: lwcgl-v2-verify-once
+  group: lwcgl-v2-verify-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   linux:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y build-essential clang pkg-config libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev xvfb
-      - name: GCC
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev xvfb pkg-config
+      - name: Build and test
+        env:
+          CC: ${{ matrix.compiler }}
+          CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
         run: xvfb-run -a make clean check
-      - name: Clang
-        run: xvfb-run -a make clean CC=clang CXX=clang++ check
-      - name: ASan UBSan
-        run: xvfb-run -a make CC=clang CXX=clang++ sanitize
+
+  sanitizer:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev xvfb pkg-config
+      - name: ASan and UBSan
+        env:
+          CC: clang
+          CXX: clang++
+          CFLAGS: -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
+          CXXFLAGS: -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
+          LDFLAGS: -fsanitize=address,undefined
+          ASAN_OPTIONS: detect_leaks=1
+        run: xvfb-run -a make clean check
+
+  macos:
+    timeout-minutes: 15
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
+      - name: Build and test
+        run: make clean check
