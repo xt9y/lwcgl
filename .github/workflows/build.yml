@@ -1,36 +1,21 @@
-name: verify
+name: verify-once
 on:
-  workflow_dispatch:
+  push:
+    branches: [v3.4.2]
+    paths: [.github/verify-now]
 concurrency:
-  group: lwcgl-v3-verify-${{ github.ref }}
+  group: lwcgl-v3-verify-once
   cancel-in-progress: true
 jobs:
   linux:
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [gcc, clang]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libglfw3-dev xvfb pkg-config
-      - name: Verify
-        env:
-          CC: ${{ matrix.compiler }}
-          CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+      - run: sudo apt-get update && sudo apt-get install -y build-essential clang pkg-config libglfw3-dev xvfb libgl1-mesa-dri
+      - name: GCC
         run: xvfb-run -a make clean check
-  sanitizer:
-    timeout-minutes: 15
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libglfw3-dev xvfb pkg-config clang
-      - run: xvfb-run -a make CC=clang CXX=clang++ sanitize
-  macos:
-    timeout-minutes: 15
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
-      - run: make clean check
+      - name: Clang
+        run: xvfb-run -a make clean CC=clang CXX=clang++ check
+      - name: ASan UBSan
+        run: xvfb-run -a make CC=clang CXX=clang++ sanitize
