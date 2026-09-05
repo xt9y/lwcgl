@@ -20,7 +20,7 @@ void lwcgl_glColorPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointe
 void lwcgl_glColorPointer4(GLint size, int type_or_unsigned, GLsizei stride, const ByteBuffer *pointer);
 void lwcgl_glLoadMatrixBuffer(const LWCGLBuffer *matrix);
 void lwcgl_glMultMatrixBuffer(const LWCGLBuffer *matrix);
-void lwcgl_gluPickMatrix(GLdouble x, GLdouble y, GLdouble width, GLdouble height, const IntBuffer *viewport);
+void lwcgl_gluPickMatrix(GLdouble x, GLdouble y, GLdouble width, GLdouble height, IntBuffer *viewport);
 GLint lwcgl_gluBuild2DMipmaps(GLenum target, GLint components, GLsizei width, GLsizei height, GLenum format, GLenum type, const ByteBuffer *data);
 #ifdef __cplusplus
 }
