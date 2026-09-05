@@ -29,9 +29,9 @@ void lwcgl_glFog(GLenum pname, const LWCGLBuffer *params) {
 }
 
 int lwcgl_glGetIntegerValue(GLenum pname) {
-    GLint value = 0;
-    glGetIntegerv(pname, &value);
-    return value;
+    GLint values[16] = {0};
+    glGetIntegerv(pname, values);
+    return values[0];
 }
 
 void lwcgl_glGetIntegerBuffer(GLenum pname, IntBuffer *params) {
