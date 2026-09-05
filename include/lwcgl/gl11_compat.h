@@ -1,5 +1,6 @@
 #ifndef LWCGL_GL11_COMPAT_H
 #define LWCGL_GL11_COMPAT_H
+#include <lwcgl/lwcgl.h>
 #include <stddef.h>
 #ifdef __cplusplus
 extern "C" {
