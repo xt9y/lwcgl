@@ -2,158 +2,117 @@ CC ?= cc
 CXX ?= c++
 AR ?= ar
 PREFIX ?= /usr/local
+VERSION := 2.9.3
+ABI := 2
+BUILD := build
+LIBNAME := liblwcgl-$(VERSION).a
+LIB := $(BUILD)/$(LIBNAME)
+PUBLIC_HEADERS := $(wildcard include/lwcgl/*.h)
+SRC := $(wildcard src/*.c)
+OBJ := $(patsubst src/%.c,$(BUILD)/%.o,$(SRC))
+CONFIG := $(BUILD)/.build-config
+PKGCONFIG := $(BUILD)/lwcgl-$(VERSION).pc
 
 CPPFLAGS += -Iinclude -D_POSIX_C_SOURCE=200809L
 CFLAGS ?= -O2
 CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
+CXXFLAGS ?= -O2
+CXXFLAGS += -std=c++17 -Wall -Wextra -Wpedantic
+LDFLAGS ?=
 
 PKG_CFLAGS := $(shell pkg-config --cflags glfw3 2>/dev/null)
 PKG_LIBS := $(shell pkg-config --libs glfw3 2>/dev/null)
-
 UNAME_S := $(shell uname -s)
-
 ifeq ($(UNAME_S),Darwin)
 CPPFLAGS += -DGL_SILENCE_DEPRECATION
 PLATFORM_LIBS := -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
-else
+PRIVATE_LIBS_PC := -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
+else ifeq ($(UNAME_S),Linux)
 PLATFORM_LIBS := -lGL -lGLU -lm -ldl -lpthread
+PRIVATE_LIBS_PC := -lGL -lGLU -lm -ldl -lpthread
+else
+$(error unsupported host OS: $(UNAME_S); supported hosts are Linux and macOS)
 endif
-
 CPPFLAGS += $(PKG_CFLAGS)
 LIBS := $(PKG_LIBS) $(PLATFORM_LIBS)
+TEST_DIR := $(BUILD)/tests
+TEST_BINS := $(TEST_DIR)/api-contract $(TEST_DIR)/buffer-contract $(TEST_DIR)/native-header-order $(TEST_DIR)/compat-contract $(TEST_DIR)/runtime-smoke
 
-BUILD := build
-LIB := $(BUILD)/liblwcgl.a
-OBJ := $(BUILD)/lwcgl.o $(BUILD)/display_ext.o $(BUILD)/gl11_compat.o $(BUILD)/glmodern.o
-
-.PHONY: all clean install uninstall example check check-deps deps
-
+.PHONY: all clean check test install uninstall check-deps deps stage-check FORCE
 all: check-deps $(LIB)
+test: check
 
 check-deps:
-ifeq ($(UNAME_S),Darwin)
-	@command -v pkg-config >/dev/null 2>&1 || { \
-		echo "error: pkg-config is required"; \
-		echo "install with: brew install pkg-config glfw"; \
-		exit 1; \
-	}
-	@pkg-config --exists glfw3 || { \
-		echo "error: GLFW 3 development files are missing"; \
-		echo "install with: brew install glfw"; \
-		exit 1; \
-	}
-else
-	@command -v pkg-config >/dev/null 2>&1 || { \
-		echo "error: pkg-config is required"; \
-		echo "run: make deps"; \
-		exit 1; \
-	}
-	@pkg-config --exists glfw3 || { \
-		echo "error: GLFW 3 development files are missing"; \
-		echo "run: make deps"; \
-		exit 1; \
-	}
-	@printf '#include <GL/gl.h>\n' | $(CC) -x c -E - >/dev/null 2>&1 || { \
-		echo "error: OpenGL development headers are missing"; \
-		echo "run: make deps"; \
-		exit 1; \
-	}
-	@printf '#include <GL/glu.h>\n' | $(CC) -x c -E - >/dev/null 2>&1 || { \
-		echo "error: GLU development headers are missing"; \
-		echo "run: make deps"; \
-		exit 1; \
-	}
+	@command -v pkg-config >/dev/null 2>&1 || { echo "error: pkg-config is required"; exit 1; }
+	@pkg-config --atleast-version=3.3 glfw3 || { echo "error: GLFW >= 3.3 development files are required"; exit 1; }
+ifeq ($(UNAME_S),Linux)
+	@printf '#include <GL/gl.h>\n#include <GL/glu.h>\n' | $(CC) -x c -E - >/dev/null 2>&1 || { echo "error: OpenGL and GLU development headers are required"; exit 1; }
 endif
 
 deps:
 ifeq ($(UNAME_S),Darwin)
-	@command -v brew >/dev/null 2>&1 || { echo "error: Homebrew is required to install dependencies automatically"; exit 1; }
 	HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config glfw
 else
-	@set -e; \
-	if command -v apt-get >/dev/null 2>&1; then \
-		sudo apt-get update; \
-		sudo apt-get install -y build-essential pkg-config libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev; \
-	elif command -v pacman >/dev/null 2>&1; then \
-		sudo pacman -S --needed base-devel pkgconf glfw-x11 mesa glu; \
-	elif command -v dnf >/dev/null 2>&1; then \
-		sudo dnf install -y gcc gcc-c++ make pkgconf-pkg-config glfw-devel mesa-libGL-devel mesa-libGLU-devel; \
-	elif command -v zypper >/dev/null 2>&1; then \
-		sudo zypper install -y gcc gcc-c++ make pkg-config libglfw3-devel Mesa-libGL-devel Mesa-libGLU-devel; \
-	else \
-		echo "error: unsupported package manager"; \
-		echo "install GLFW 3, OpenGL, GLU, pkg-config and a C/C++ toolchain manually"; \
-		exit 1; \
-	fi
+	@set -e; if command -v apt-get >/dev/null; then sudo apt-get update && sudo apt-get install -y build-essential pkg-config libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev xvfb; elif command -v pacman >/dev/null; then sudo pacman -S --needed base-devel pkgconf glfw-x11 mesa glu xorg-server-xvfb; elif command -v dnf >/dev/null; then sudo dnf install -y gcc gcc-c++ make pkgconf-pkg-config glfw-devel mesa-libGL-devel mesa-libGLU-devel xorg-x11-server-Xvfb; else echo "error: install GLFW >= 3.3, OpenGL, GLU and pkg-config manually"; exit 1; fi
 endif
 
-$(BUILD):
-	mkdir -p $(BUILD)
+$(BUILD) $(TEST_DIR):
+	mkdir -p $@
 
-$(BUILD)/lwcgl.o: src/lwcgl.c src/context_wrap.h include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Wno-missing-field-initializers -DLWCGL_CONTEXT_WRAP -include src/context_wrap.h -c src/lwcgl.c -o $@
+FORCE:
+$(CONFIG): FORCE | $(BUILD)
+	@{ printf '%s\n' 'CC=$(CC)' 'CXX=$(CXX)' 'CPPFLAGS=$(CPPFLAGS)' 'CFLAGS=$(CFLAGS)' 'CXXFLAGS=$(CXXFLAGS)' 'LDFLAGS=$(LDFLAGS)' 'SRC=$(SRC)' 'HEADERS=$(PUBLIC_HEADERS)'; } > $@.tmp
+	@cmp -s $@.tmp $@ 2>/dev/null || mv $@.tmp $@
+	@rm -f $@.tmp
 
-$(BUILD)/display_ext.o: src/display_ext.c src/input_state.h include/lwcgl/lwcgl.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/display_ext.c -o $@
+$(BUILD)/keyboard.o: src/key_table.inc
 
-$(BUILD)/gl11_compat.o: src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/gl11_compat.c -o $@
-
-$(BUILD)/glmodern.o: src/glmodern.c include/lwcgl/lwcgl.h include/lwcgl/context.h include/lwcgl/glmodern.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/glmodern.c -o $@
+$(BUILD)/%.o: src/%.c $(PUBLIC_HEADERS) src/internal.h $(CONFIG) | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror -c $< -o $@
 
 $(LIB): $(OBJ)
+	rm -f $@
 	$(AR) rcs $@ $^
 
-example: check-deps $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Iinclude tests/rd132328_contract.cpp $(LIB) $(LIBS) -o $(BUILD)/rd132328-example
+$(PKGCONFIG): lwcgl-2.9.3.pc.in | $(BUILD)
+	sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@PRIVATE_LIBS@|$(PRIVATE_LIBS_PC)|g' $< > $@
 
-$(BUILD)/rd132328-contract: tests/rd132328_contract.cpp $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/rd132328_contract.cpp $(LIB) $(LIBS) -o $@
+$(TEST_DIR)/api-contract: tests/api_contract.cpp $(LIB) | $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Werror $< $(LIB) $(LDFLAGS) $(LIBS) -o $@
+$(TEST_DIR)/buffer-contract: tests/buffer_contract.cpp $(LIB) | $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Werror $< $(LIB) $(LDFLAGS) $(LIBS) -o $@
+$(TEST_DIR)/native-header-order: tests/native_header_order.c $(LIB) | $(TEST_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $< $(LIB) $(LDFLAGS) $(LIBS) -o $@
+$(TEST_DIR)/compat-contract: tests/compat_contract.cpp $(LIB) | $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Werror $< $(LIB) $(LDFLAGS) $(LIBS) -o $@
+$(TEST_DIR)/runtime-smoke: tests/runtime_smoke.c $(LIB) | $(TEST_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $< $(LIB) $(LDFLAGS) $(LIBS) -o $@
 
-$(BUILD)/modern-gl-contract: tests/modern_gl_contract.cpp $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Iinclude tests/modern_gl_contract.cpp $(LIB) $(LIBS) -o $@
+check: check-deps $(TEST_BINS) stage-check
+	$(TEST_DIR)/api-contract
+	$(TEST_DIR)/buffer-contract
+	$(TEST_DIR)/native-header-order
+	$(TEST_DIR)/compat-contract
+	$(TEST_DIR)/runtime-smoke
 
-$(BUILD)/display-update-contract: tests/display_update_contract.cpp $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/display_update_contract.cpp $(LIB) $(LIBS) -o $@
+stage-check: $(LIB) $(PKGCONFIG)
+	rm -rf $(BUILD)/stage
+	$(MAKE) install DESTDIR=$(abspath $(BUILD)/stage) PREFIX=/usr
+	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) $(CC) $(CFLAGS) tests/stage_consumer.c $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) pkg-config --cflags --libs lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-c
+	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) $(CXX) $(CXXFLAGS) tests/stage_consumer.cpp $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) pkg-config --cflags --libs lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-cpp
+	$(TEST_DIR)/stage-consumer-c
+	$(TEST_DIR)/stage-consumer-cpp
 
-$(BUILD)/input-state-contract: tests/input_state_contract.cpp src/input_state.h | $(BUILD)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/input_state_contract.cpp -o $@
-
-$(BUILD)/buffer-type-contract: tests/buffer_type_contract.cpp $(LIB)
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/buffer_type_contract.cpp $(LIB) $(LIBS) -o $@
-
-$(BUILD)/gl11-query-contract-asan: tests/gl11_query_contract.c src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -O1 -g -fsanitize=address -fno-omit-frame-pointer -Iinclude tests/gl11_query_contract.c src/gl11_compat.c $(LIBS) -o $@
-
-$(BUILD)/gl11-buffer-contract-asan: tests/gl11_buffer_contract.c src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude tests/gl11_buffer_contract.c src/gl11_compat.c -o $@
-
-check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract $(BUILD)/input-state-contract $(BUILD)/buffer-type-contract $(BUILD)/gl11-query-contract-asan $(BUILD)/gl11-buffer-contract-asan
-	$(BUILD)/rd132328-contract
-	$(BUILD)/modern-gl-contract
-	$(BUILD)/display-update-contract
-	$(BUILD)/input-state-contract
-	$(BUILD)/buffer-type-contract
-	ASAN_OPTIONS=detect_leaks=0 $(BUILD)/gl11-query-contract-asan
-	ASAN_OPTIONS=detect_leaks=0 $(BUILD)/gl11-buffer-contract-asan
-
-install: $(LIB)
-	install -d $(DESTDIR)$(PREFIX)/include/lwcgl
-	install -m 0644 include/lwcgl/lwcgl.h $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
-	install -m 0644 include/lwcgl/gl11_compat.h $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
-	install -m 0644 include/lwcgl/context.h $(DESTDIR)$(PREFIX)/include/lwcgl/context.h
-	install -m 0644 include/lwcgl/glmodern.h $(DESTDIR)$(PREFIX)/include/lwcgl/glmodern.h
-	install -d $(DESTDIR)$(PREFIX)/lib
-	install -m 0644 $(LIB) $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
+install: check-deps $(LIB)
+	install -d $(DESTDIR)$(PREFIX)/include/lwcgl-$(VERSION)/lwcgl
+	install -m 0644 $(PUBLIC_HEADERS) $(DESTDIR)$(PREFIX)/include/lwcgl-$(VERSION)/lwcgl/
+	install -d $(DESTDIR)$(PREFIX)/lib/pkgconfig
+	install -m 0644 $(LIB) $(DESTDIR)$(PREFIX)/lib/$(LIBNAME)
+	@sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@PRIVATE_LIBS@|$(PRIVATE_LIBS_PC)|g' lwcgl-2.9.3.pc.in > $(DESTDIR)$(PREFIX)/lib/pkgconfig/lwcgl-$(VERSION).pc
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/lwcgl.h
-	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/gl11_compat.h
-	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/context.h
-	rm -f $(DESTDIR)$(PREFIX)/include/lwcgl/glmodern.h
-	rmdir $(DESTDIR)$(PREFIX)/include/lwcgl 2>/dev/null || true
-	rm -f $(DESTDIR)$(PREFIX)/lib/liblwcgl.a
+	rm -rf $(DESTDIR)$(PREFIX)/include/lwcgl-$(VERSION)
+	rm -f $(DESTDIR)$(PREFIX)/lib/$(LIBNAME) $(DESTDIR)$(PREFIX)/lib/pkgconfig/lwcgl-$(VERSION).pc
 
 clean:
 	rm -rf $(BUILD)

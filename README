@@ -1,5 +1,6 @@
 lwcgl v2.9.3
 
-Native C implementation of LWJGL v2.9.3 for C / C++.
+Native C implementation of the LWJGL 2.9.3 compatibility surface.
 
 install --> make && sudo make install
+check   --> make check

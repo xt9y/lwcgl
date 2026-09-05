@@ -1,27 +1,19 @@
 #define LWCGL_IMPLEMENTATION
 #include <lwcgl/lwcgl.h>
-
 #include <stdint.h>
+#include <limits.h>
 
-static size_t buffer_remaining_elements(const LWCGLBuffer *buffer) {
-    return buffer && buffer->limit >= buffer->position ? buffer->limit - buffer->position : 0;
+static size_t remaining(const LWCGLBuffer *b) { return b && b->limit >= b->position ? b->limit - b->position : 0; }
+static LWCGLbool has(const LWCGLBuffer *b, LWCGLBufferScalarType type, size_t n) {
+    return b && b->data && b->scalarType == type && b->position <= b->limit && remaining(b) >= n;
 }
-
-static LWCGLbool buffer_has(const LWCGLBuffer *buffer, LWCGLBufferScalarType type,
-                            size_t minimum) {
-    return buffer && buffer->data && buffer->scalarType == type &&
-           buffer->position <= buffer->limit && buffer_remaining_elements(buffer) >= minimum;
+static const void *ptr(const LWCGLBuffer *b) {
+    if (!b || !b->data || b->position > b->limit) return NULL;
+    return (const unsigned char *)b->data + b->position * b->elementSize;
 }
-
-static const void *buffer_pointer(const LWCGLBuffer *buffer) {
-    if (!buffer || !buffer->data || buffer->position >= buffer->limit)
-        return NULL;
-    return (const unsigned char *)buffer->data + buffer->position * buffer->elementSize;
-}
-
-static GLenum buffer_gl_type(const LWCGLBuffer *buffer) {
-    if (!buffer || !buffer_pointer(buffer)) return 0;
-    switch (buffer->scalarType) {
+static GLenum gl_type(const LWCGLBuffer *b) {
+    if (!b || !ptr(b)) return 0;
+    switch (b->scalarType) {
         case LWCGL_BUFFER_BYTE: return GL_BYTE;
         case LWCGL_BUFFER_SHORT: return GL_SHORT;
         case LWCGL_BUFFER_INT: return GL_INT;
@@ -30,285 +22,73 @@ static GLenum buffer_gl_type(const LWCGLBuffer *buffer) {
         default: return 0;
     }
 }
-
-static LWCGLbool checked_add_size(size_t a, size_t b, size_t *out) {
-    if (!out || a > SIZE_MAX - b) return LWCGL_FALSE;
-    *out = a + b;
+static size_t integer_count(GLenum pname) {
+    switch (pname) {
+#ifdef GL_VIEWPORT
+        case GL_VIEWPORT:
+#endif
+#ifdef GL_SCISSOR_BOX
+        case GL_SCISSOR_BOX:
+#endif
+#ifdef GL_COLOR_WRITEMASK
+        case GL_COLOR_WRITEMASK:
+#endif
+            return 4;
+#ifdef GL_MAX_VIEWPORT_DIMS
+        case GL_MAX_VIEWPORT_DIMS:
+#endif
+#ifdef GL_POLYGON_MODE
+        case GL_POLYGON_MODE:
+#endif
+            return 2;
+        default: return 1;
+    }
+}
+static LWCGLbool add_size(size_t a,size_t b,size_t *o){if(!o||a>SIZE_MAX-b)return LWCGL_FALSE;*o=a+b;return LWCGL_TRUE;}
+static LWCGLbool mul_size(size_t a,size_t b,size_t *o){if(!o||(a&&b>SIZE_MAX/a))return LWCGL_FALSE;*o=a*b;return LWCGL_TRUE;}
+static LWCGLbool components(GLenum f,size_t *c){
+    switch(f){
+        case GL_COLOR_INDEX: case GL_STENCIL_INDEX: case GL_DEPTH_COMPONENT: case GL_RED: case GL_GREEN: case GL_BLUE:
+        case GL_ALPHA: case GL_LUMINANCE:*c=1;return LWCGL_TRUE;
+        case GL_LUMINANCE_ALPHA:*c=2;return LWCGL_TRUE;
+        case GL_RGB:*c=3;return LWCGL_TRUE;
+        case GL_RGBA:*c=4;return LWCGL_TRUE;
+        default:return LWCGL_FALSE;
+    }
+}
+static LWCGLbool pixel_size(GLenum format,GLenum type,size_t *bytes){
+    size_t c=0,s=0;if(!components(format,&c))return LWCGL_FALSE;
+    switch(type){case GL_BYTE:case GL_UNSIGNED_BYTE:s=1;break;case GL_SHORT:case GL_UNSIGNED_SHORT:s=2;break;
+        case GL_INT:case GL_UNSIGNED_INT:case GL_FLOAT:s=4;break;default:return LWCGL_FALSE;}
+    return mul_size(c,s,bytes);
+}
+static LWCGLbool image_bytes(GLsizei width,GLsizei height,GLenum format,GLenum type,size_t *required){
+    GLint alignment=4,row_length=0,skip_rows=0,skip_pixels=0; size_t px,rowpx,rowbytes,stride,start_rows,start_px,start,prior,last,tmp;
+    if(!required||width<=0||height<=0||!pixel_size(format,type,&px))return LWCGL_FALSE;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT,&alignment); glGetIntegerv(GL_UNPACK_ROW_LENGTH,&row_length);
+    glGetIntegerv(GL_UNPACK_SKIP_ROWS,&skip_rows); glGetIntegerv(GL_UNPACK_SKIP_PIXELS,&skip_pixels);
+    if((alignment!=1&&alignment!=2&&alignment!=4&&alignment!=8)||row_length<0||skip_rows<0||skip_pixels<0)return LWCGL_FALSE;
+    rowpx=row_length?(size_t)row_length:(size_t)width;
+    if(!mul_size(rowpx,px,&rowbytes)||!add_size(rowbytes,(size_t)alignment-1,&tmp))return LWCGL_FALSE;
+    stride=(tmp/(size_t)alignment)*(size_t)alignment;
+    if(!mul_size((size_t)skip_rows,stride,&start_rows)||!mul_size((size_t)skip_pixels,px,&start_px)||!add_size(start_rows,start_px,&start)||
+       !mul_size((size_t)(height-1),stride,&prior)||!mul_size((size_t)width,px,&last)||!add_size(start,prior,&tmp)||!add_size(tmp,last,required))return LWCGL_FALSE;
     return LWCGL_TRUE;
 }
-
-static LWCGLbool checked_mul_size(size_t a, size_t b, size_t *out) {
-    if (!out || (a != 0 && b > SIZE_MAX / a)) return LWCGL_FALSE;
-    *out = a * b;
-    return LWCGL_TRUE;
-}
-
-static LWCGLbool format_components(GLenum format, size_t *components) {
-    if (!components) return LWCGL_FALSE;
-    switch (format) {
-        case GL_COLOR_INDEX:
-        case GL_STENCIL_INDEX:
-        case GL_DEPTH_COMPONENT:
-        case GL_RED:
-        case GL_GREEN:
-        case GL_BLUE:
-        case GL_ALPHA:
-        case GL_LUMINANCE:
-            *components = 1;
-            return LWCGL_TRUE;
-        case GL_LUMINANCE_ALPHA:
-            *components = 2;
-            return LWCGL_TRUE;
-        case GL_RGB:
-#ifdef GL_BGR
-        case GL_BGR:
-#endif
-            *components = 3;
-            return LWCGL_TRUE;
-        case GL_RGBA:
-#ifdef GL_BGRA
-        case GL_BGRA:
-#endif
-            *components = 4;
-            return LWCGL_TRUE;
-        default:
-            return LWCGL_FALSE;
-    }
-}
-
-static LWCGLbool pixel_bytes(GLenum format, GLenum type, size_t *bytes) {
-    size_t components = 0;
-    size_t scalar = 0;
-    if (!bytes) return LWCGL_FALSE;
-
-    switch (type) {
-#ifdef GL_UNSIGNED_BYTE_3_3_2
-        case GL_UNSIGNED_BYTE_3_3_2:
-#endif
-#ifdef GL_UNSIGNED_BYTE_2_3_3_REV
-        case GL_UNSIGNED_BYTE_2_3_3_REV:
-#endif
-            *bytes = 1;
-            return LWCGL_TRUE;
-#ifdef GL_UNSIGNED_SHORT_5_6_5
-        case GL_UNSIGNED_SHORT_5_6_5:
-#endif
-#ifdef GL_UNSIGNED_SHORT_5_6_5_REV
-        case GL_UNSIGNED_SHORT_5_6_5_REV:
-#endif
-#ifdef GL_UNSIGNED_SHORT_4_4_4_4
-        case GL_UNSIGNED_SHORT_4_4_4_4:
-#endif
-#ifdef GL_UNSIGNED_SHORT_4_4_4_4_REV
-        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-#endif
-#ifdef GL_UNSIGNED_SHORT_5_5_5_1
-        case GL_UNSIGNED_SHORT_5_5_5_1:
-#endif
-#ifdef GL_UNSIGNED_SHORT_1_5_5_5_REV
-        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-#endif
-            *bytes = 2;
-            return LWCGL_TRUE;
-#ifdef GL_UNSIGNED_INT_8_8_8_8
-        case GL_UNSIGNED_INT_8_8_8_8:
-#endif
-#ifdef GL_UNSIGNED_INT_8_8_8_8_REV
-        case GL_UNSIGNED_INT_8_8_8_8_REV:
-#endif
-#ifdef GL_UNSIGNED_INT_10_10_10_2
-        case GL_UNSIGNED_INT_10_10_10_2:
-#endif
-#ifdef GL_UNSIGNED_INT_2_10_10_10_REV
-        case GL_UNSIGNED_INT_2_10_10_10_REV:
-#endif
-            *bytes = 4;
-            return LWCGL_TRUE;
-        default:
-            break;
-    }
-
-    if (!format_components(format, &components)) return LWCGL_FALSE;
-    switch (type) {
-        case GL_BYTE:
-        case GL_UNSIGNED_BYTE:
-            scalar = 1;
-            break;
-        case GL_SHORT:
-        case GL_UNSIGNED_SHORT:
-            scalar = 2;
-            break;
-        case GL_INT:
-        case GL_UNSIGNED_INT:
-        case GL_FLOAT:
-            scalar = 4;
-            break;
-        default:
-            return LWCGL_FALSE;
-    }
-    return checked_mul_size(components, scalar, bytes);
-}
-
-static LWCGLbool image_required_bytes(GLsizei width, GLsizei height, GLenum format,
-                                      GLenum type, size_t *required) {
-    GLint alignment = 4;
-    GLint row_length = 0;
-    GLint skip_rows = 0;
-    GLint skip_pixels = 0;
-    size_t per_pixel = 0;
-    size_t row_pixels;
-    size_t row_bytes;
-    size_t row_stride;
-    size_t start_rows;
-    size_t start_pixels;
-    size_t start;
-    size_t prior_rows;
-    size_t last_row;
-    size_t temporary;
-
-    if (!required || width <= 0 || height <= 0 || !pixel_bytes(format, type, &per_pixel))
-        return LWCGL_FALSE;
-
-    glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
-    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &row_length);
-    glGetIntegerv(GL_UNPACK_SKIP_ROWS, &skip_rows);
-    glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &skip_pixels);
-
-    if ((alignment != 1 && alignment != 2 && alignment != 4 && alignment != 8) ||
-        row_length < 0 || skip_rows < 0 || skip_pixels < 0)
-        return LWCGL_FALSE;
-
-    row_pixels = row_length > 0 ? (size_t)row_length : (size_t)width;
-    if (!checked_mul_size(row_pixels, per_pixel, &row_bytes) ||
-        !checked_add_size(row_bytes, (size_t)alignment - 1u, &temporary))
-        return LWCGL_FALSE;
-    row_stride = (temporary / (size_t)alignment) * (size_t)alignment;
-
-    if (!checked_mul_size((size_t)skip_rows, row_stride, &start_rows) ||
-        !checked_mul_size((size_t)skip_pixels, per_pixel, &start_pixels) ||
-        !checked_add_size(start_rows, start_pixels, &start) ||
-        !checked_mul_size((size_t)(height - 1), row_stride, &prior_rows) ||
-        !checked_mul_size((size_t)width, per_pixel, &last_row) ||
-        !checked_add_size(start, prior_rows, &temporary) ||
-        !checked_add_size(temporary, last_row, required))
-        return LWCGL_FALSE;
-
-    return LWCGL_TRUE;
-}
-
-void lwcgl_glFog(GLenum pname, const LWCGLBuffer *params) {
-    if (buffer_has(params, LWCGL_BUFFER_FLOAT, 4)) {
-        glFogfv(pname, (const GLfloat *)buffer_pointer(params));
-    } else if (buffer_has(params, LWCGL_BUFFER_INT, 4)) {
-        glFogiv(pname, (const GLint *)buffer_pointer(params));
-    }
-}
-
-int lwcgl_glGetIntegerValue(GLenum pname) {
-    GLint values[16] = {0};
-    glGetIntegerv(pname, values);
-    return values[0];
-}
-
-void lwcgl_glGetIntegerBuffer(GLenum pname, IntBuffer *params) {
-    if (!buffer_has(params, LWCGL_BUFFER_INT, 16)) return;
-    glGetIntegerv(pname, (GLint *)Buffer.address(params));
-}
-
-void lwcgl_glSelectBuffer(IntBuffer *buffer) {
-    if (!buffer_has(buffer, LWCGL_BUFFER_INT, 1)) return;
-    glSelectBuffer((GLsizei)Buffer.remaining(buffer), (GLuint *)Buffer.address(buffer));
-}
-
-GLuint lwcgl_glGenTexture(void) {
-    GLuint texture = 0;
-    glGenTextures(1, &texture);
-    return texture;
-}
-
-void lwcgl_glGenTexturesBuffer(IntBuffer *textures) {
-    if (!buffer_has(textures, LWCGL_BUFFER_INT, 1)) return;
-    glGenTextures((GLsizei)Buffer.remaining(textures), (GLuint *)Buffer.address(textures));
-}
-
-void lwcgl_glDeleteTexture(GLuint texture) {
-    glDeleteTextures(1, &texture);
-}
-
-void lwcgl_glVertexPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer) {
-    GLenum type = buffer_gl_type(pointer);
-    if (!type || pointer->scalarType == LWCGL_BUFFER_BYTE || pointer->scalarType == LWCGL_BUFFER_LONG)
-        return;
-    glVertexPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glVertexPointer4(GLint size, GLenum type, GLsizei stride, const ByteBuffer *pointer) {
-    if (!buffer_has(pointer, LWCGL_BUFFER_BYTE, 1)) return;
-    glVertexPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glTexCoordPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer) {
-    GLenum type = buffer_gl_type(pointer);
-    if (!type || pointer->scalarType == LWCGL_BUFFER_BYTE || pointer->scalarType == LWCGL_BUFFER_LONG)
-        return;
-    glTexCoordPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glTexCoordPointer4(GLint size, GLenum type, GLsizei stride, const ByteBuffer *pointer) {
-    if (!buffer_has(pointer, LWCGL_BUFFER_BYTE, 1)) return;
-    glTexCoordPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glColorPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer) {
-    GLenum type = buffer_gl_type(pointer);
-    if (!type || (pointer->scalarType != LWCGL_BUFFER_FLOAT &&
-                  pointer->scalarType != LWCGL_BUFFER_DOUBLE))
-        return;
-    glColorPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glColorPointer4(GLint size, int type_or_unsigned, GLsizei stride,
-                           const ByteBuffer *pointer) {
-    GLenum type;
-    if (!buffer_has(pointer, LWCGL_BUFFER_BYTE, 1)) return;
-    if (type_or_unsigned == LWCGL_FALSE)
-        type = GL_BYTE;
-    else if (type_or_unsigned == LWCGL_TRUE)
-        type = GL_UNSIGNED_BYTE;
-    else
-        type = (GLenum)type_or_unsigned;
-    glColorPointer(size, type, stride, buffer_pointer(pointer));
-}
-
-void lwcgl_glLoadMatrixBuffer(const LWCGLBuffer *matrix) {
-    if (buffer_has(matrix, LWCGL_BUFFER_FLOAT, 16))
-        glLoadMatrixf((const GLfloat *)buffer_pointer(matrix));
-    else if (buffer_has(matrix, LWCGL_BUFFER_DOUBLE, 16))
-        glLoadMatrixd((const GLdouble *)buffer_pointer(matrix));
-}
-
-void lwcgl_glMultMatrixBuffer(const LWCGLBuffer *matrix) {
-    if (buffer_has(matrix, LWCGL_BUFFER_FLOAT, 16))
-        glMultMatrixf((const GLfloat *)buffer_pointer(matrix));
-    else if (buffer_has(matrix, LWCGL_BUFFER_DOUBLE, 16))
-        glMultMatrixd((const GLdouble *)buffer_pointer(matrix));
-}
-
-void lwcgl_gluPickMatrix(GLdouble x, GLdouble y, GLdouble width, GLdouble height,
-                         const IntBuffer *viewport) {
-    if (!buffer_has(viewport, LWCGL_BUFFER_INT, 4)) return;
-    gluPickMatrix(x, y, width, height, (const GLint *)buffer_pointer(viewport));
-}
-
-GLint lwcgl_gluBuild2DMipmaps(GLenum target, GLint components, GLsizei width,
-                              GLsizei height, GLenum format, GLenum type,
-                              const ByteBuffer *data) {
-    size_t required = 0;
-    if (width <= 0 || height <= 0) return GLU_INVALID_VALUE;
-    if (!data || data->scalarType != LWCGL_BUFFER_BYTE ||
-        !image_required_bytes(width, height, format, type, &required))
-        return GLU_INVALID_ENUM;
-    if (required > buffer_remaining_elements(data)) return GLU_INVALID_VALUE;
-    return gluBuild2DMipmaps(target, components, width, height, format, type,
-                             buffer_pointer(data));
-}
+void lwcgl_glFog(GLenum pname,const LWCGLBuffer *p){size_t n=pname==GL_FOG_COLOR?4:1;if(has(p,LWCGL_BUFFER_FLOAT,n))glFogfv(pname,(const GLfloat*)ptr(p));else if(has(p,LWCGL_BUFFER_INT,n))glFogiv(pname,(const GLint*)ptr(p));}
+int lwcgl_glGetIntegerValue(GLenum pname){GLint v[16]={0};glGetIntegerv(pname,v);return v[0];}
+void lwcgl_glGetIntegerBuffer(GLenum pname,IntBuffer *p){size_t n=integer_count(pname);if(!has(p,LWCGL_BUFFER_INT,n))return;glGetIntegerv(pname,(GLint*)Buffer.address(p));}
+void lwcgl_glSelectBuffer(IntBuffer *b){if(!has(b,LWCGL_BUFFER_INT,1)||remaining(b)>(size_t)INT_MAX)return;glSelectBuffer((GLsizei)remaining(b),(GLuint*)Buffer.address(b));}
+GLuint lwcgl_glGenTexture(void){GLuint t=0;glGenTextures(1,&t);return t;}
+void lwcgl_glGenTexturesBuffer(IntBuffer *b){if(!has(b,LWCGL_BUFFER_INT,1)||remaining(b)>(size_t)INT_MAX)return;glGenTextures((GLsizei)remaining(b),(GLuint*)Buffer.address(b));}
+void lwcgl_glDeleteTexture(GLuint t){glDeleteTextures(1,&t);}
+void lwcgl_glVertexPointer3(GLint size,GLsizei stride,const LWCGLBuffer *p){GLenum t=gl_type(p);if(!t||p->scalarType==LWCGL_BUFFER_BYTE||p->scalarType==LWCGL_BUFFER_LONG)return;glVertexPointer(size,t,stride,ptr(p));}
+void lwcgl_glVertexPointer4(GLint size,GLenum type,GLsizei stride,const ByteBuffer *p){if(!has(p,LWCGL_BUFFER_BYTE,1))return;glVertexPointer(size,type,stride,ptr(p));}
+void lwcgl_glTexCoordPointer3(GLint size,GLsizei stride,const LWCGLBuffer *p){GLenum t=gl_type(p);if(!t||p->scalarType==LWCGL_BUFFER_BYTE||p->scalarType==LWCGL_BUFFER_LONG)return;glTexCoordPointer(size,t,stride,ptr(p));}
+void lwcgl_glTexCoordPointer4(GLint size,GLenum type,GLsizei stride,const ByteBuffer *p){if(!has(p,LWCGL_BUFFER_BYTE,1))return;glTexCoordPointer(size,type,stride,ptr(p));}
+void lwcgl_glColorPointer3(GLint size,GLsizei stride,const LWCGLBuffer *p){GLenum t=gl_type(p);if(!t||!(p->scalarType==LWCGL_BUFFER_FLOAT||p->scalarType==LWCGL_BUFFER_DOUBLE))return;glColorPointer(size,t,stride,ptr(p));}
+void lwcgl_glColorPointer4(GLint size,int type_or_unsigned,GLsizei stride,const ByteBuffer *p){if(!has(p,LWCGL_BUFFER_BYTE,1))return;GLenum t=type_or_unsigned==LWCGL_FALSE?GL_BYTE:type_or_unsigned==LWCGL_TRUE?GL_UNSIGNED_BYTE:(GLenum)type_or_unsigned;glColorPointer(size,t,stride,ptr(p));}
+void lwcgl_glLoadMatrixBuffer(const LWCGLBuffer *m){if(has(m,LWCGL_BUFFER_FLOAT,16))glLoadMatrixf((const GLfloat*)ptr(m));else if(has(m,LWCGL_BUFFER_DOUBLE,16))glLoadMatrixd((const GLdouble*)ptr(m));}
+void lwcgl_glMultMatrixBuffer(const LWCGLBuffer *m){if(has(m,LWCGL_BUFFER_FLOAT,16))glMultMatrixf((const GLfloat*)ptr(m));else if(has(m,LWCGL_BUFFER_DOUBLE,16))glMultMatrixd((const GLdouble*)ptr(m));}
+void lwcgl_gluPickMatrix(GLdouble x,GLdouble y,GLdouble w,GLdouble h,const IntBuffer *v){if(has(v,LWCGL_BUFFER_INT,4))gluPickMatrix(x,y,w,h,(const GLint*)ptr(v));}
+GLint lwcgl_gluBuild2DMipmaps(GLenum target,GLint comps,GLsizei w,GLsizei h,GLenum format,GLenum type,const ByteBuffer *data){size_t req=0;if(w<=0||h<=0)return GLU_INVALID_VALUE;if(!data||data->scalarType!=LWCGL_BUFFER_BYTE||!image_bytes(w,h,format,type,&req))return GLU_INVALID_ENUM;if(req>remaining(data))return GLU_INVALID_VALUE;return gluBuild2DMipmaps(target,comps,w,h,format,type,ptr(data));}
