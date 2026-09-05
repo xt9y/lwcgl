@@ -28,6 +28,12 @@ typedef struct LWCGLsyncOpaque *LWCGLsync;
 #ifndef GL_ELEMENT_ARRAY_BUFFER
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #endif
+#ifndef GL_DRAW_INDIRECT_BUFFER
+#define GL_DRAW_INDIRECT_BUFFER 0x8F3F
+#endif
+#ifndef GL_DRAW_INDIRECT_BUFFER_BINDING
+#define GL_DRAW_INDIRECT_BUFFER_BINDING 0x8F43
+#endif
 #ifndef GL_COPY_READ_BUFFER
 #define GL_COPY_READ_BUFFER 0x8F36
 #endif
@@ -211,6 +217,9 @@ typedef struct LWCGLsyncOpaque *LWCGLsync;
 #ifndef GL_TEXTURE_FETCH_BARRIER_BIT
 #define GL_TEXTURE_FETCH_BARRIER_BIT 0x00000008
 #endif
+#ifndef GL_COMMAND_BARRIER_BIT
+#define GL_COMMAND_BARRIER_BIT 0x00000040
+#endif
 #ifndef GL_SHADER_STORAGE_BARRIER_BIT
 #define GL_SHADER_STORAGE_BARRIER_BIT 0x00002000
 #endif
@@ -359,10 +368,14 @@ typedef struct GL42API {
     void (*glMemoryBarrier)(GLbitfield barriers);
 } GL42API;
 
-/* GL43: compute dispatch. */
+/* GL43: compute dispatch and multi-draw indirect. */
 typedef struct GL43API {
     void (*glDispatchCompute)(GLuint groups_x, GLuint groups_y, GLuint groups_z);
     void (*glDispatchComputeIndirect)(LWCGLintptr indirect);
+    void (*glMultiDrawArraysIndirect)(GLenum mode, const void *indirect,
+                                      GLsizei draw_count, GLsizei stride);
+    void (*glMultiDrawElementsIndirect)(GLenum mode, GLenum type, const void *indirect,
+                                        GLsizei draw_count, GLsizei stride);
 } GL43API;
 
 /* Common post-GL11 functions not naturally owned by the groups above. */
