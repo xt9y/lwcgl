@@ -181,6 +181,8 @@ int lwcglLoadModernGL(void) {
 
     LWCGL_LOAD(GL43, glDispatchCompute, glDispatchCompute);
     LWCGL_LOAD(GL43, glDispatchComputeIndirect, glDispatchComputeIndirect);
+    LWCGL_LOAD(GL43, glMultiDrawArraysIndirect, glMultiDrawArraysIndirect);
+    LWCGL_LOAD(GL43, glMultiDrawElementsIndirect, glMultiDrawElementsIndirect);
 
     LWCGL_LOAD(GLModern, glActiveTexture, glActiveTexture);
     LWCGL_LOAD(GLModern, glTexImage3D, glTexImage3D);
