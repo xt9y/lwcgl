@@ -1,36 +1,25 @@
-name: PS1RAP CI Source Bundle
-
+name: source bundle
 on:
-  push:
-    branches: [v3.4.2]
   workflow_dispatch:
-
+    inputs:
+      revision:
+        description: Git revision to export
+        required: true
+        default: v3.4.2
 permissions:
   contents: read
-
 jobs:
-  bundle:
-    runs-on: ubuntu-24.04
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Checkout complete repository history
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - name: Create verified Git bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p ps1rap-ci
-          git bundle create ps1rap-ci/lwcgl.bundle --all
-          git bundle verify ps1rap-ci/lwcgl.bundle
-          git cat-file -e 44e01b6a641ade528ad7bf13b561846162ae063c^{commit}
-          git cat-file -e 7dcb87a15b8e60dc81457e603b319067a298f94e^{commit}
-          sha256sum ps1rap-ci/lwcgl.bundle > ps1rap-ci/SHA256SUMS
-          git rev-parse HEAD > ps1rap-ci/HEAD
-      - name: Upload source bundle
-        uses: actions/upload-artifact@v4
+          ref: ${{ inputs.revision }}
+          fetch-depth: 1
+      - run: git archive --format=tar.gz --output=lwcgl-${{ github.sha }}.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
         with:
-          name: ps1rap-lwcgl-source
-          path: ps1rap-ci/
+          name: lwcgl-source-${{ github.sha }}
+          path: lwcgl-${{ github.sha }}.tar.gz
           if-no-files-found: error
-          retention-days: 30

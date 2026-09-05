@@ -1,183 +1,28 @@
 #include <lwcgl/lwcgl.h>
-
 #include "lwcgl_internal.h"
-
 #include <stdlib.h>
 #include <string.h>
-
-#define LWCGL_DEFAULT_STACK_CAPACITY (64u * 1024u)
-#define LWCGL_STACK_ALIGNMENT 16u
-
-struct LWCGLMemoryStack {
-    unsigned char *memory;
-    size_t capacity;
-    size_t pointer;
-    struct LWCGLMemoryStack *previous;
-};
-
-static _Thread_local LWCGLMemoryStack *g_stack;
-
-static size_t align_up(size_t value, size_t alignment) {
-    const size_t mask = alignment - 1u;
-    return (value + mask) & ~mask;
-}
-
-static void *memory_alloc(size_t size) {
-    if (size == 0) size = 1;
-    void *pointer = malloc(size);
-    if (!pointer) lwcglSetErrorInternal("MemoryUtil.memAlloc: allocation failed");
-    return pointer;
-}
-
-static void *memory_calloc(size_t count, size_t size) {
-    if (count != 0 && size > SIZE_MAX / count) {
-        lwcglSetErrorInternal("MemoryUtil.memCalloc: size overflow");
-        return NULL;
-    }
-    if (count == 0 || size == 0) {
-        count = 1;
-        size = 1;
-    }
-    void *pointer = calloc(count, size);
-    if (!pointer) lwcglSetErrorInternal("MemoryUtil.memCalloc: allocation failed");
-    return pointer;
-}
-
-static void *memory_realloc(void *pointer, size_t size) {
-    if (size == 0) size = 1;
-    void *next = realloc(pointer, size);
-    if (!next) lwcglSetErrorInternal("MemoryUtil.memRealloc: allocation failed");
-    return next;
-}
-
-static void memory_free(void *pointer) {
-    free(pointer);
-}
-
-static uintptr_t memory_address(const void *pointer) {
-    return (uintptr_t)pointer;
-}
-
-static void *memory_address_to_pointer(uintptr_t address) {
-    return (void *)address;
-}
-
-static char *memory_copy_string(const char *text) {
-    if (!text) return NULL;
-    const size_t length = strlen(text);
-    char *copy = (char *)memory_alloc(length + 1u);
-    if (!copy) return NULL;
-    memcpy(copy, text, length + 1u);
-    return copy;
-}
-
-static size_t memory_length_nt1(const char *text) {
-    return text ? strlen(text) + 1u : 0u;
-}
-
-static LWCGLMemoryStack *stack_push_capacity(size_t capacity) {
-    if (capacity == 0) capacity = LWCGL_DEFAULT_STACK_CAPACITY;
-
-    LWCGLMemoryStack *stack = (LWCGLMemoryStack *)calloc(1, sizeof(*stack));
-    if (!stack) {
-        lwcglSetErrorInternal("MemoryStack.stackPush: frame allocation failed");
-        return NULL;
-    }
-
-    stack->memory = (unsigned char *)malloc(capacity);
-    if (!stack->memory) {
-        free(stack);
-        lwcglSetErrorInternal("MemoryStack.stackPush: storage allocation failed");
-        return NULL;
-    }
-
-    stack->capacity = capacity;
-    stack->previous = g_stack;
-    g_stack = stack;
-    return stack;
-}
-
-static LWCGLMemoryStack *stack_push(void) {
-    return stack_push_capacity(LWCGL_DEFAULT_STACK_CAPACITY);
-}
-
-static void stack_pop(LWCGLMemoryStack *stack) {
-    if (!stack) return;
-    if (stack != g_stack) {
-        lwcglSetErrorInternal("MemoryStack.stackPop: frames must be popped in LIFO order");
-        return;
-    }
-    g_stack = stack->previous;
-    free(stack->memory);
-    stack->memory = NULL;
-    free(stack);
-}
-
-static void *stack_malloc(LWCGLMemoryStack *stack, size_t size) {
-    if (!stack || stack != g_stack) {
-        lwcglSetErrorInternal("MemoryStack.malloc: stack frame is not current");
-        return NULL;
-    }
-
-    const size_t aligned = align_up(stack->pointer, LWCGL_STACK_ALIGNMENT);
-    if (aligned > stack->capacity || size > stack->capacity - aligned) {
-        lwcglSetErrorInternal("MemoryStack.malloc: stack overflow");
-        return NULL;
-    }
-
-    void *pointer = stack->memory + aligned;
-    stack->pointer = aligned + size;
-    return pointer;
-}
-
-static void *stack_calloc(LWCGLMemoryStack *stack, size_t count, size_t size) {
-    if (count != 0 && size > SIZE_MAX / count) {
-        lwcglSetErrorInternal("MemoryStack.calloc: size overflow");
-        return NULL;
-    }
-    const size_t bytes = count * size;
-    void *pointer = stack_malloc(stack, bytes);
-    if (pointer && bytes) memset(pointer, 0, bytes);
-    return pointer;
-}
-
-static char *stack_string(LWCGLMemoryStack *stack, const char *text) {
-    if (!text) return NULL;
-    const size_t length = strlen(text) + 1u;
-    char *copy = (char *)stack_malloc(stack, length);
-    if (!copy) return NULL;
-    memcpy(copy, text, length);
-    return copy;
-}
-
-static size_t stack_get_pointer(const LWCGLMemoryStack *stack) {
-    return stack ? stack->pointer : 0u;
-}
-
-static size_t stack_get_capacity(const LWCGLMemoryStack *stack) {
-    return stack ? stack->capacity : 0u;
-}
-
-MemoryUtilAPI MemoryUtil = {
-    memory_alloc,
-    memory_calloc,
-    memory_realloc,
-    memory_free,
-    memory_address,
-    memory_address_to_pointer,
-    memory_copy_string,
-    memory_copy_string,
-    memory_length_nt1
-};
-
-MemoryStackAPI MemoryStack = {
-    stack_push,
-    stack_push_capacity,
-    stack_pop,
-    stack_malloc,
-    stack_calloc,
-    stack_string,
-    stack_string,
-    stack_get_pointer,
-    stack_get_capacity
-};
+#define DEFAULT_CAP (64u*1024u)
+#define ALIGNMENT 16u
+#define MAX_DEPTH 64u
+struct LWCGLMemoryStack { size_t base,pointer,limit,saved_parent; unsigned depth; };
+typedef struct Arena { unsigned char *memory; size_t capacity,pointer; unsigned depth; LWCGLMemoryStack frames[MAX_DEPTH]; } Arena;
+static LWCGL_THREAD_LOCAL Arena arena;
+static int align_up(size_t v,size_t *out){size_t mask=ALIGNMENT-1u;if(v>SIZE_MAX-mask)return -1;*out=(v+mask)&~mask;return 0;}
+static int ensure(size_t need){if(need<=arena.capacity)return 0;size_t cap=arena.capacity?arena.capacity:DEFAULT_CAP;while(cap<need){if(cap>SIZE_MAX/2u){cap=need;break;}cap*=2u;}unsigned char*n=(unsigned char*)realloc(arena.memory,cap);if(!n){lwcglSetErrorInternal(LWCGL_ERROR_OUT_OF_MEMORY,"MemoryStack: arena growth failed");return -1;}arena.memory=n;arena.capacity=cap;return 0;}
+static void *m_alloc(size_t n){lwcglClearError();if(!n)n=1;void*p=malloc(n);if(!p)lwcglSetErrorInternal(LWCGL_ERROR_OUT_OF_MEMORY,"MemoryUtil.memAlloc: allocation failed");return p;}
+static void *m_calloc(size_t c,size_t n){lwcglClearError();if(c&&n>SIZE_MAX/c){lwcglSetErrorInternal(LWCGL_ERROR_OVERFLOW,"MemoryUtil.memCalloc: size overflow");return NULL;}if(!c||!n){c=n=1;}void*p=calloc(c,n);if(!p)lwcglSetErrorInternal(LWCGL_ERROR_OUT_OF_MEMORY,"MemoryUtil.memCalloc: allocation failed");return p;}
+static void *m_realloc(void*p,size_t n){lwcglClearError();if(!n)n=1;void*q=realloc(p,n);if(!q)lwcglSetErrorInternal(LWCGL_ERROR_OUT_OF_MEMORY,"MemoryUtil.memRealloc: allocation failed");return q;}
+static void m_free(void*p){lwcglClearError();free(p);} static uintptr_t m_addr(const void*p){lwcglClearError();return(uintptr_t)p;} static void *m_ptr(uintptr_t a){lwcglClearError();return(void*)a;}
+static char *m_str(const char*s){lwcglClearError();if(!s){lwcglSetErrorInternal(LWCGL_ERROR_INVALID_ARGUMENT,"MemoryUtil string: text is NULL");return NULL;}size_t n=strlen(s);char*p=(char*)malloc(n+1u);if(!p){lwcglSetErrorInternal(LWCGL_ERROR_OUT_OF_MEMORY,"MemoryUtil string: allocation failed");return NULL;}memcpy(p,s,n+1u);return p;}
+static size_t m_len(const char*s){lwcglClearError();return s?strlen(s):0u;}
+static LWCGLMemoryStack *push_cap(size_t cap){lwcglClearError();if(!cap)cap=DEFAULT_CAP;if(arena.depth>=MAX_DEPTH){lwcglSetErrorInternal(LWCGL_ERROR_STATE,"MemoryStack.stackPush: maximum nesting depth reached");return NULL;}size_t base;if(align_up(arena.pointer,&base)||cap>SIZE_MAX-base){lwcglSetErrorInternal(LWCGL_ERROR_OVERFLOW,"MemoryStack.stackPush: size overflow");return NULL;}size_t limit=base+cap;if(ensure(limit))return NULL;LWCGLMemoryStack*f=&arena.frames[arena.depth];f->base=base;f->pointer=base;f->limit=limit;f->saved_parent=arena.pointer;f->depth=arena.depth++;arena.pointer=base;return f;}
+static LWCGLMemoryStack *push(void){return push_cap(DEFAULT_CAP);}
+static void pop(LWCGLMemoryStack*f){lwcglClearError();if(!f)return;if(!arena.depth||f!=&arena.frames[arena.depth-1u]){lwcglSetErrorInternal(LWCGL_ERROR_STATE,"MemoryStack.stackPop: frames must be popped in LIFO order");return;}arena.pointer=f->saved_parent;memset(f,0,sizeof *f);arena.depth--;}
+static void *s_malloc(LWCGLMemoryStack*f,size_t n){lwcglClearError();if(!f||!arena.depth||f!=&arena.frames[arena.depth-1u]){lwcglSetErrorInternal(LWCGL_ERROR_STATE,"MemoryStack.malloc: stack frame is not current");return NULL;}size_t a;if(align_up(f->pointer,&a)||a>f->limit||n>f->limit-a){lwcglSetErrorInternal(LWCGL_ERROR_OVERFLOW,"MemoryStack.malloc: stack overflow");return NULL;}void*p=arena.memory+a;f->pointer=a+n;arena.pointer=f->pointer;return p;}
+static void *s_calloc(LWCGLMemoryStack*f,size_t c,size_t n){if(c&&n>SIZE_MAX/c){lwcglSetErrorInternal(LWCGL_ERROR_OVERFLOW,"MemoryStack.calloc: size overflow");return NULL;}size_t b=c*n;void*p=s_malloc(f,b);if(p&&b)memset(p,0,b);return p;}
+static char *s_str(LWCGLMemoryStack*f,const char*s){if(!s){lwcglSetErrorInternal(LWCGL_ERROR_INVALID_ARGUMENT,"MemoryStack string: text is NULL");return NULL;}size_t n=strlen(s);char*p=(char*)s_malloc(f,n+1u);if(p)memcpy(p,s,n+1u);return p;}
+static size_t s_pos(const LWCGLMemoryStack*f){return f?f->pointer-f->base:0u;} static size_t s_cap(const LWCGLMemoryStack*f){return f?f->limit-f->base:0u;}
+static void trim(void){lwcglClearError();if(arena.depth){lwcglSetErrorInternal(LWCGL_ERROR_STATE,"MemoryStack.trimThreadArena: stack frames are still active");return;}free(arena.memory);memset(&arena,0,sizeof arena);}
+const MemoryUtilAPI MemoryUtil={m_alloc,m_calloc,m_realloc,m_free,m_addr,m_ptr,m_str,m_str,m_len};
+const MemoryStackAPI MemoryStack={push,push_cap,pop,s_malloc,s_calloc,s_str,s_str,s_pos,s_cap,trim};

@@ -1,5 +1,9 @@
 lwcgl v3.4.2
 
-Native C implementation of LWJGL v3.4.2 for C / C++.
+Native C/C++ facade for the supported LWJGL 3.4.2 GLFW/OpenGL surface.
 
+branch  --> v3.4.2
+build   --> make
+test    --> make check
 install --> make && sudo make install
+link    --> pkg-config --cflags --libs --static lwcgl-3.4.2

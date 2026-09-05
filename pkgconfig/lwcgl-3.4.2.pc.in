@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/lwcgl-3.4.2
+Name: lwcgl-3.4.2
+Description: Native C facade for the supported LWJGL 3.4.2 GLFW/OpenGL surface
+Version: 3.4.2
+Requires.private: glfw3 >= 3.3
+Libs: -L${libdir} -llwcgl-3.4.2
+Cflags: -I${includedir}

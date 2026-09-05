@@ -1,44 +1,22 @@
 #ifndef LWCGL_MEMORY_H
 #define LWCGL_MEMORY_H
-
-#include <stddef.h>
-#include <stdint.h>
-
+#include <lwcgl/common.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 typedef struct LWCGLMemoryStack LWCGLMemoryStack;
-
 typedef struct MemoryUtilAPI {
-    void *(*memAlloc)(size_t size);
-    void *(*memCalloc)(size_t count, size_t size);
-    void *(*memRealloc)(void *pointer, size_t size);
-    void (*memFree)(void *pointer);
-    uintptr_t (*memAddress)(const void *pointer);
-    void *(*memAddressToPointer)(uintptr_t address);
-    char *(*memASCII)(const char *text);
-    char *(*memUTF8)(const char *text);
-    size_t (*memLengthNT1)(const char *text);
+    void *(*memAlloc)(size_t); void *(*memCalloc)(size_t,size_t); void *(*memRealloc)(void*,size_t); void (*memFree)(void*);
+    uintptr_t (*memAddress)(const void*); void *(*memAddressToPointer)(uintptr_t); char *(*memASCII)(const char*); char *(*memUTF8)(const char*); size_t (*memLengthNT1)(const char*);
 } MemoryUtilAPI;
-
 typedef struct MemoryStackAPI {
-    LWCGLMemoryStack *(*stackPush)(void);
-    LWCGLMemoryStack *(*stackPushCapacity)(size_t capacity);
-    void (*stackPop)(LWCGLMemoryStack *stack);
-    void *(*malloc)(LWCGLMemoryStack *stack, size_t size);
-    void *(*calloc)(LWCGLMemoryStack *stack, size_t count, size_t size);
-    char *(*ASCII)(LWCGLMemoryStack *stack, const char *text);
-    char *(*UTF8)(LWCGLMemoryStack *stack, const char *text);
-    size_t (*getPointer)(const LWCGLMemoryStack *stack);
-    size_t (*getCapacity)(const LWCGLMemoryStack *stack);
+    LWCGLMemoryStack *(*stackPush)(void); LWCGLMemoryStack *(*stackPushCapacity)(size_t); void (*stackPop)(LWCGLMemoryStack*);
+    void *(*malloc)(LWCGLMemoryStack*,size_t); void *(*calloc)(LWCGLMemoryStack*,size_t,size_t); char *(*ASCII)(LWCGLMemoryStack*,const char*); char *(*UTF8)(LWCGLMemoryStack*,const char*);
+    size_t (*getPointer)(const LWCGLMemoryStack*); size_t (*getCapacity)(const LWCGLMemoryStack*); void (*trimThreadArena)(void);
 } MemoryStackAPI;
-
-extern MemoryUtilAPI MemoryUtil;
-extern MemoryStackAPI MemoryStack;
-
+extern const MemoryUtilAPI MemoryUtil;
+extern const MemoryStackAPI MemoryStack;
 #ifdef __cplusplus
 }
 #endif
-
 #endif
