@@ -16,8 +16,11 @@ GLuint lwcgl_glGenTexture(void);
 void lwcgl_glGenTexturesBuffer(IntBuffer *textures);
 void lwcgl_glDeleteTexture(GLuint texture);
 void lwcgl_glVertexPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer);
+void lwcgl_glVertexPointer4(GLint size, GLenum type, GLsizei stride, const ByteBuffer *pointer);
 void lwcgl_glTexCoordPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer);
+void lwcgl_glTexCoordPointer4(GLint size, GLenum type, GLsizei stride, const ByteBuffer *pointer);
 void lwcgl_glColorPointer3(GLint size, GLsizei stride, const LWCGLBuffer *pointer);
+void lwcgl_glColorPointer4(GLint size, int typeOrUnsigned, GLsizei stride, const ByteBuffer *pointer);
 void lwcgl_glLoadMatrixBuffer(const LWCGLBuffer *matrix);
 void lwcgl_glMultMatrixBuffer(const LWCGLBuffer *matrix);
 
@@ -56,14 +59,16 @@ GLint lwcgl_gluBuild2DMipmaps(GLenum target, GLint components, GLsizei width,
 #define glDeleteTextures(texture_) \
     lwcgl_glDeleteTexture((GLuint)(texture_))
 
-#define glVertexPointer(size_, stride_, pointer_) \
-    lwcgl_glVertexPointer3((size_), (stride_), (const LWCGLBuffer *)(pointer_))
+#define LWCGL_POINTER_SELECT(_1, _2, _3, _4, NAME, ...) NAME
 
-#define glTexCoordPointer(size_, stride_, pointer_) \
-    lwcgl_glTexCoordPointer3((size_), (stride_), (const LWCGLBuffer *)(pointer_))
+#define glVertexPointer(...) \
+    LWCGL_POINTER_SELECT(__VA_ARGS__, lwcgl_glVertexPointer4, lwcgl_glVertexPointer3)(__VA_ARGS__)
 
-#define glColorPointer(size_, stride_, pointer_) \
-    lwcgl_glColorPointer3((size_), (stride_), (const LWCGLBuffer *)(pointer_))
+#define glTexCoordPointer(...) \
+    LWCGL_POINTER_SELECT(__VA_ARGS__, lwcgl_glTexCoordPointer4, lwcgl_glTexCoordPointer3)(__VA_ARGS__)
+
+#define glColorPointer(...) \
+    LWCGL_POINTER_SELECT(__VA_ARGS__, lwcgl_glColorPointer4, lwcgl_glColorPointer3)(__VA_ARGS__)
 
 #define glLoadMatrix(matrix_) \
     lwcgl_glLoadMatrixBuffer((const LWCGLBuffer *)(matrix_))
@@ -75,8 +80,8 @@ GLint lwcgl_gluBuild2DMipmaps(GLenum target, GLint components, GLsizei width,
     lwcgl_gluPickMatrix((x_), (y_), (width_), (height_), (viewport_))
 
 #define gluBuild2DMipmaps(target_, components_, width_, height_, format_, type_, data_) \
-    lwcgl_gluBuild2DMipmaps((target_), (components_), (width_), (height_), \
-                            (format_), (type_), (data_))
+    lwcgl_gluBuild2DMipmaps((target_), (components_), (width_), (height_), (format_), \
+                            (type_), (data_))
 
 #endif
 

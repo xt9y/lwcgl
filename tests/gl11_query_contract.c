@@ -3,6 +3,8 @@
 
 #include <assert.h>
 
+BufferAPI Buffer = {0};
+
 static int g_get_integer_calls;
 
 void glGetIntegerv(GLenum pname, GLint *params) {

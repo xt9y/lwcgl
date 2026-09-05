@@ -120,15 +120,23 @@ $(BUILD)/display-update-contract: tests/display_update_contract.cpp $(LIB)
 $(BUILD)/input-state-contract: tests/input_state_contract.cpp src/input_state.h | $(BUILD)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror tests/input_state_contract.cpp -o $@
 
+$(BUILD)/buffer-type-contract: tests/buffer_type_contract.cpp $(LIB)
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/buffer_type_contract.cpp $(LIB) $(LIBS) -o $@
+
 $(BUILD)/gl11-query-contract-asan: tests/gl11_query_contract.c src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -O1 -g -fsanitize=address -fno-omit-frame-pointer -Iinclude tests/gl11_query_contract.c src/gl11_compat.c $(LIBS) -o $@
 
-check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract $(BUILD)/input-state-contract $(BUILD)/gl11-query-contract-asan
+$(BUILD)/gl11-buffer-contract-asan: tests/gl11_buffer_contract.c src/gl11_compat.c include/lwcgl/lwcgl.h include/lwcgl/gl11_compat.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude tests/gl11_buffer_contract.c src/gl11_compat.c -o $@
+
+check: check-deps $(BUILD)/rd132328-contract $(BUILD)/modern-gl-contract $(BUILD)/display-update-contract $(BUILD)/input-state-contract $(BUILD)/buffer-type-contract $(BUILD)/gl11-query-contract-asan $(BUILD)/gl11-buffer-contract-asan
 	$(BUILD)/rd132328-contract
 	$(BUILD)/modern-gl-contract
 	$(BUILD)/display-update-contract
 	$(BUILD)/input-state-contract
+	$(BUILD)/buffer-type-contract
 	ASAN_OPTIONS=detect_leaks=0 $(BUILD)/gl11-query-contract-asan
+	ASAN_OPTIONS=detect_leaks=0 $(BUILD)/gl11-buffer-contract-asan
 
 install: $(LIB)
 	install -d $(DESTDIR)$(PREFIX)/include/lwcgl

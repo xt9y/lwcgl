@@ -42,6 +42,16 @@ typedef DisplayMode LWCGLDisplayModeValue;
 #define DisplayMode(width_, height_) ((DisplayMode){(width_), (height_), 0, 0, LWCGL_FALSE})
 #endif
 
+typedef enum LWCGLBufferScalarType {
+    LWCGL_BUFFER_UNKNOWN = 0,
+    LWCGL_BUFFER_BYTE,
+    LWCGL_BUFFER_SHORT,
+    LWCGL_BUFFER_INT,
+    LWCGL_BUFFER_LONG,
+    LWCGL_BUFFER_FLOAT,
+    LWCGL_BUFFER_DOUBLE
+} LWCGLBufferScalarType;
+
 typedef struct LWCGLBuffer {
     void *data;
     size_t elementSize;
@@ -49,6 +59,7 @@ typedef struct LWCGLBuffer {
     size_t position;
     size_t limit;
     size_t mark;
+    LWCGLBufferScalarType scalarType;
 } LWCGLBuffer;
 
 typedef LWCGLBuffer ByteBuffer;

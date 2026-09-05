@@ -52,7 +52,8 @@ static uint64_t nano_time(void) {
 /* BufferUtils / Buffer                                                      */
 /* ------------------------------------------------------------------------- */
 
-static LWCGLBuffer *buffer_create(size_t count, size_t element_size) {
+static LWCGLBuffer *buffer_create(size_t count, size_t element_size,
+                                  LWCGLBufferScalarType scalar_type) {
     LWCGLBuffer *buffer = (LWCGLBuffer *)calloc(1, sizeof(*buffer));
     if (!buffer) {
         set_error("out of memory allocating buffer object");
@@ -77,15 +78,28 @@ static LWCGLBuffer *buffer_create(size_t count, size_t element_size) {
     buffer->position = 0;
     buffer->limit = count;
     buffer->mark = SIZE_MAX;
+    buffer->scalarType = scalar_type;
     return buffer;
 }
 
-static ByteBuffer *buffer_create_byte(size_t n) { return buffer_create(n, sizeof(int8_t)); }
-static ShortBuffer *buffer_create_short(size_t n) { return buffer_create(n, sizeof(int16_t)); }
-static IntBuffer *buffer_create_int(size_t n) { return buffer_create(n, sizeof(int32_t)); }
-static LongBuffer *buffer_create_long(size_t n) { return buffer_create(n, sizeof(int64_t)); }
-static FloatBuffer *buffer_create_float(size_t n) { return buffer_create(n, sizeof(float)); }
-static DoubleBuffer *buffer_create_double(size_t n) { return buffer_create(n, sizeof(double)); }
+static ByteBuffer *buffer_create_byte(size_t n) {
+    return buffer_create(n, sizeof(int8_t), LWCGL_BUFFER_BYTE);
+}
+static ShortBuffer *buffer_create_short(size_t n) {
+    return buffer_create(n, sizeof(int16_t), LWCGL_BUFFER_SHORT);
+}
+static IntBuffer *buffer_create_int(size_t n) {
+    return buffer_create(n, sizeof(int32_t), LWCGL_BUFFER_INT);
+}
+static LongBuffer *buffer_create_long(size_t n) {
+    return buffer_create(n, sizeof(int64_t), LWCGL_BUFFER_LONG);
+}
+static FloatBuffer *buffer_create_float(size_t n) {
+    return buffer_create(n, sizeof(float), LWCGL_BUFFER_FLOAT);
+}
+static DoubleBuffer *buffer_create_double(size_t n) {
+    return buffer_create(n, sizeof(double), LWCGL_BUFFER_DOUBLE);
+}
 
 static void buffer_destroy(LWCGLBuffer *buffer) {
     if (!buffer) return;
@@ -147,17 +161,19 @@ static LWCGLbool buffer_has_remaining(const LWCGLBuffer *b) {
 }
 
 static void *buffer_address(LWCGLBuffer *b) {
-    if (!b || !b->data) return NULL;
+    if (!b || !b->data || b->position > b->limit) return NULL;
     return (unsigned char *)b->data + b->position * b->elementSize;
 }
 
 static const void *buffer_const_address(const LWCGLBuffer *b) {
-    if (!b || !b->data) return NULL;
+    if (!b || !b->data || b->position > b->limit) return NULL;
     return (const unsigned char *)b->data + b->position * b->elementSize;
 }
 
-static int buffer_put_raw(LWCGLBuffer *b, const void *value, size_t expected) {
-    if (!b || !value || b->elementSize != expected || b->position >= b->limit) {
+static int buffer_put_raw(LWCGLBuffer *b, const void *value, size_t expected,
+                          LWCGLBufferScalarType scalar_type) {
+    if (!b || !value || b->elementSize != expected || b->scalarType != scalar_type ||
+        b->position >= b->limit) {
         set_error("buffer overflow or type mismatch");
         return -1;
     }
@@ -166,8 +182,10 @@ static int buffer_put_raw(LWCGLBuffer *b, const void *value, size_t expected) {
     return 0;
 }
 
-static int buffer_put_raw_at(LWCGLBuffer *b, size_t index, const void *value, size_t expected) {
-    if (!b || !value || b->elementSize != expected || index >= b->limit) {
+static int buffer_put_raw_at(LWCGLBuffer *b, size_t index, const void *value,
+                             size_t expected, LWCGLBufferScalarType scalar_type) {
+    if (!b || !value || b->elementSize != expected || b->scalarType != scalar_type ||
+        index >= b->limit) {
         set_error("buffer index overflow or type mismatch");
         return -1;
     }
@@ -175,8 +193,10 @@ static int buffer_put_raw_at(LWCGLBuffer *b, size_t index, const void *value, si
     return 0;
 }
 
-static int buffer_get_raw(LWCGLBuffer *b, void *value, size_t expected) {
-    if (!b || !value || b->elementSize != expected || b->position >= b->limit) {
+static int buffer_get_raw(LWCGLBuffer *b, void *value, size_t expected,
+                          LWCGLBufferScalarType scalar_type) {
+    if (!b || !value || b->elementSize != expected || b->scalarType != scalar_type ||
+        b->position >= b->limit) {
         set_error("buffer underflow or type mismatch");
         return -1;
     }
@@ -185,8 +205,10 @@ static int buffer_get_raw(LWCGLBuffer *b, void *value, size_t expected) {
     return 0;
 }
 
-static int buffer_get_raw_at(const LWCGLBuffer *b, size_t index, void *value, size_t expected) {
-    if (!b || !value || b->elementSize != expected || index >= b->limit) {
+static int buffer_get_raw_at(const LWCGLBuffer *b, size_t index, void *value,
+                             size_t expected, LWCGLBufferScalarType scalar_type) {
+    if (!b || !value || b->elementSize != expected || b->scalarType != scalar_type ||
+        index >= b->limit) {
         set_error("buffer index overflow or type mismatch");
         return -1;
     }
@@ -194,15 +216,41 @@ static int buffer_get_raw_at(const LWCGLBuffer *b, size_t index, void *value, si
     return 0;
 }
 
-static int buffer_put_byte(ByteBuffer *b, int8_t v) { return buffer_put_raw(b, &v, sizeof(v)); }
-static int buffer_put_int(IntBuffer *b, int32_t v) { return buffer_put_raw(b, &v, sizeof(v)); }
-static int buffer_put_int_at(IntBuffer *b, size_t i, int32_t v) { return buffer_put_raw_at(b, i, &v, sizeof(v)); }
-static int32_t buffer_get_int(IntBuffer *b) { int32_t v = 0; buffer_get_raw(b, &v, sizeof(v)); return v; }
-static int32_t buffer_get_int_at(const IntBuffer *b, size_t i) { int32_t v = 0; buffer_get_raw_at(b, i, &v, sizeof(v)); return v; }
-static int buffer_put_float(FloatBuffer *b, float v) { return buffer_put_raw(b, &v, sizeof(v)); }
-static int buffer_put_float_at(FloatBuffer *b, size_t i, float v) { return buffer_put_raw_at(b, i, &v, sizeof(v)); }
-static float buffer_get_float(FloatBuffer *b) { float v = 0.0f; buffer_get_raw(b, &v, sizeof(v)); return v; }
-static float buffer_get_float_at(const FloatBuffer *b, size_t i) { float v = 0.0f; buffer_get_raw_at(b, i, &v, sizeof(v)); return v; }
+static int buffer_put_byte(ByteBuffer *b, int8_t v) {
+    return buffer_put_raw(b, &v, sizeof(v), LWCGL_BUFFER_BYTE);
+}
+static int buffer_put_int(IntBuffer *b, int32_t v) {
+    return buffer_put_raw(b, &v, sizeof(v), LWCGL_BUFFER_INT);
+}
+static int buffer_put_int_at(IntBuffer *b, size_t i, int32_t v) {
+    return buffer_put_raw_at(b, i, &v, sizeof(v), LWCGL_BUFFER_INT);
+}
+static int32_t buffer_get_int(IntBuffer *b) {
+    int32_t v = 0;
+    buffer_get_raw(b, &v, sizeof(v), LWCGL_BUFFER_INT);
+    return v;
+}
+static int32_t buffer_get_int_at(const IntBuffer *b, size_t i) {
+    int32_t v = 0;
+    buffer_get_raw_at(b, i, &v, sizeof(v), LWCGL_BUFFER_INT);
+    return v;
+}
+static int buffer_put_float(FloatBuffer *b, float v) {
+    return buffer_put_raw(b, &v, sizeof(v), LWCGL_BUFFER_FLOAT);
+}
+static int buffer_put_float_at(FloatBuffer *b, size_t i, float v) {
+    return buffer_put_raw_at(b, i, &v, sizeof(v), LWCGL_BUFFER_FLOAT);
+}
+static float buffer_get_float(FloatBuffer *b) {
+    float v = 0.0f;
+    buffer_get_raw(b, &v, sizeof(v), LWCGL_BUFFER_FLOAT);
+    return v;
+}
+static float buffer_get_float_at(const FloatBuffer *b, size_t i) {
+    float v = 0.0f;
+    buffer_get_raw_at(b, i, &v, sizeof(v), LWCGL_BUFFER_FLOAT);
+    return v;
+}
 
 BufferUtilsAPI BufferUtils = {
     buffer_create_byte,
