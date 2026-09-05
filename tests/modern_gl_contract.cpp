@@ -37,7 +37,16 @@ static void compile_modern_gl_surface() {
     GL30.glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
     GL42.glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
     GL43.glDispatchCompute(1, 1, 1);
-    GL42.glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+    GL42.glMemoryBarrier(
+        GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
+        GL_SHADER_STORAGE_BARRIER_BIT |
+        GL_COMMAND_BARRIER_BIT
+    );
+
+    GL15.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer);
+    GL43.glMultiDrawArraysIndirect(GL_TRIANGLES, nullptr, 1, 0);
+    GL43.glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr, 1, 0);
+    GL15.glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
     LWCGLsync sync = GL32.glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     if (sync)
