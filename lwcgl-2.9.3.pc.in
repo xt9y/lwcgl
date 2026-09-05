@@ -6,5 +6,7 @@ includedir=${prefix}/include/lwcgl-2.9.3
 Name: lwcgl-2.9.3
 Description: Native C compatibility implementation of LWJGL 2.9.3
 Version: 2.9.3
-Libs: -L${libdir} -llwcgl-2.9.3 @PRIVATE_LIBS@
+Requires.private: glfw3 >= 3.3
+Libs: -L${libdir} -llwcgl-2.9.3
+Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}

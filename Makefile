@@ -87,10 +87,10 @@ sanitize:
 	$(MAKE) clean
 	$(MAKE) CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Wpedantic -fsanitize=address,undefined -fno-omit-frame-pointer' CXXFLAGS='-O1 -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address,undefined -fno-omit-frame-pointer' LDFLAGS='-fsanitize=address,undefined' check
 stage-check: $(LIB) $(PKGCONFIG)
-	rm -rf $(BUILD)/stage
-	$(MAKE) install DESTDIR=$(abspath $(BUILD)/stage) PREFIX=/usr
-	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) $(CC) $(CFLAGS) tests/stage_consumer.c $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) pkg-config --cflags --libs lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-c
-	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) $(CXX) $(CXXFLAGS) tests/stage_consumer.cpp $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage)/usr/lib/pkgconfig PKG_CONFIG_SYSROOT_DIR=$(abspath $(BUILD)/stage) pkg-config --cflags --libs lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-cpp
+	rm -rf $(BUILD)/stage-prefix
+	$(MAKE) install PREFIX=$(abspath $(BUILD)/stage-prefix)
+	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage-prefix)/lib/pkgconfig $(CC) $(CFLAGS) tests/stage_consumer.c $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage-prefix)/lib/pkgconfig pkg-config --cflags --libs --static lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-c
+	PKG_CONFIG_PATH=$(abspath $(BUILD)/stage-prefix)/lib/pkgconfig $(CXX) $(CXXFLAGS) tests/stage_consumer.cpp $$(PKG_CONFIG_PATH=$(abspath $(BUILD)/stage-prefix)/lib/pkgconfig pkg-config --cflags --libs --static lwcgl-$(VERSION)) -o $(TEST_DIR)/stage-consumer-cpp
 	$(TEST_DIR)/stage-consumer-c
 	$(TEST_DIR)/stage-consumer-cpp
 install: check-deps $(LIB)
